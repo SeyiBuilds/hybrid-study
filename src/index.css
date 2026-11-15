@@ -22,6 +22,8 @@
   --color-local: #2c7552;
   --color-cloud: #2a6fae;
   --color-highlight: #f5e17a;
+  /* The student's own writing: blue biro. */
+  --color-pen: #1d4fc4;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -36,11 +38,134 @@
     --color-local: #63c093;
     --color-cloud: #6daee6;
     --color-highlight: #6b5d1a;
+    --color-pen: #9db8ff;
   }
 }
 
 :root {
   color-scheme: light dark;
+  /* Highlighter inks, drawn over the white PDF page with multiply blending. */
+  --hl-yellow: #ffe066;
+  --hl-green: #a6e3a1;
+  --hl-pink: #ffb0cc;
+}
+
+/*
+ * Selectable text over the PDF page. Adapted from pdf.js (web/pdf_viewer.css, Apache 2.0):
+ * only the rules the text layer needs, without the rest of the viewer.
+ */
+.textLayer {
+  position: absolute;
+  inset: 0;
+  overflow: clip;
+  opacity: 1;
+  line-height: 1;
+  text-align: initial;
+  letter-spacing: normal;
+  word-spacing: normal;
+  -webkit-text-size-adjust: none;
+  text-size-adjust: none;
+  forced-color-adjust: none;
+  transform-origin: 0 0;
+  z-index: 0;
+  --min-font-size: 1;
+  --text-scale-factor: calc(var(--total-scale-factor) * var(--min-font-size));
+  --min-font-size-inv: calc(1 / var(--min-font-size));
+}
+.textLayer :is(span, br) {
+  color: transparent;
+  position: absolute;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0% 0%;
+  user-select: text;
+}
+.textLayer > :not(.markedContent),
+.textLayer .markedContent span:not(.markedContent) {
+  z-index: 1;
+  --font-height: 0;
+  font-size: calc(var(--text-scale-factor) * var(--font-height));
+  --scale-x: 1;
+  --rotate: 0deg;
+  transform: rotate(var(--rotate)) scaleX(var(--scale-x)) scale(var(--min-font-size-inv));
+}
+.textLayer .markedContent {
+  display: contents;
+}
+.textLayer span[role='img'] {
+  user-select: none;
+  cursor: default;
+}
+.textLayer ::selection {
+  background: rgb(42 111 174 / 0.3);
+  color: transparent;
+}
+.textLayer br::selection {
+  background: transparent;
+}
+.textLayer .endOfContent {
+  display: block;
+  position: absolute;
+  inset: 100% 0 0;
+  z-index: 0;
+  cursor: default;
+  user-select: none;
+}
+.textLayer.selecting .endOfContent {
+  top: 0;
+}
+
+@keyframes highlight-flash {
+  0%,
+  100% {
+    outline: 2px solid transparent;
+  }
+  30% {
+    outline: 2px solid #182848;
+  }
+}
+.highlight-flash {
+  animation: highlight-flash 1.2s ease-out 2;
+  outline-offset: 1px;
+}
+
+/* A thin line being drawn along the ruled paper while the AI works. */
+@keyframes pencil-line {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(260%);
+  }
+}
+.pencil-line {
+  position: relative;
+  height: 2px;
+  overflow: hidden;
+  background: var(--color-ruling);
+}
+.pencil-line::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  width: 40%;
+  background: var(--color-ink);
+  opacity: 0.7;
+  animation: pencil-line 1.4s ease-in-out infinite;
+}
+
+@keyframes reveal {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.reveal {
+  animation: reveal 220ms ease-out;
 }
 
 html {

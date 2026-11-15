@@ -1,94 +1,21 @@
-import { useEffect, useState, type ReactNode } from 'react'
-import { estimateCloudBytesFor, type OnDeviceStatus } from '../ai/client'
-import { decide } from '../ai/router'
-import { buildSummaryPrompt, parseSummary, summarisePage, summaryKey, useSummaryJob } from '../ai/summaries'
-import { dataSize, seconds } from '../lib/format'
-import { getPageSummary, type PageSummary } from '../lib/library'
+import { useEffect, useState } from 'react'
+import type { OnDeviceStatus } from '../ai/client'
+import { dismissJob, useJob } from '../ai/jobs'
+import { buildSummaryPrompt, summarisePage, summaryJobKey } from '../ai/summaries'
+import { getPageSummary, savePageSummary, type PageSummary } from '../lib/library'
 import { hasUsableText, type PageText } from '../lib/pageText'
+import { forcedTarget, useRunOn } from '../lib/runOn'
+import { AiText, MarginMarks, Row, Working } from './sheet'
+import { penField, pillButton, previewRun, quietButton, textButton } from './sheetStyles'
 
-/** A row of the sheet, with an optional note written in the margin. */
-function Row({ note, noteClass = '', children }: { note?: ReactNode; noteClass?: string; children?: ReactNode }) {
-  return (
-    <div className="relative">
-      {note !== undefined && <span className={`margin-note ${noteClass}`}>{note}</span>}
-      <div className="past-margin pr-5 sm:pr-8">{children}</div>
-    </div>
-  )
+function toEditable(text: string): string {
+  return text
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => line.replace(/^(?:[*•–]|\d{1,2}[.)])\s+/, '- '))
+    .join('\n')
 }
-
-/** Renders **bold** spans from model output. */
-function Inline({ text }: { text: string }) {
-  const parts = text.split(/\*\*(.+?)\*\*/g)
-  return (
-    <>
-      {parts.map((part, index) =>
-        index % 2 === 1 ? (
-          <strong key={index} className="font-[620]">
-            {part}
-          </strong>
-        ) : (
-          part.replace(/\*/g, '')
-        ),
-      )}
-    </>
-  )
-}
-
-function SummaryText({ text, streaming }: { text: string; streaming: boolean }) {
-  const lines = parseSummary(text)
-  return (
-    <div className="reading">
-      {lines.map((line, index) =>
-        line.kind === 'item' ? (
-          <p key={index} className="on-lines flex gap-3">
-            <span className="mt-[calc(var(--line)/2-3px)] h-1.5 w-1.5 shrink-0 rounded-full bg-ink/70" aria-hidden />
-            <span className="min-w-0">
-              <Inline text={line.text} />
-            </span>
-          </p>
-        ) : (
-          <p key={index} className="on-lines">
-            <Inline text={line.text} />
-          </p>
-        ),
-      )}
-      {streaming && <span className="ml-1 inline-block h-4 w-[2px] translate-y-[3px] animate-pulse bg-ink" aria-hidden />}
-    </div>
-  )
-}
-
-/** Where it ran, how long it took and the data it used, stacked in the margin like marks on a script. */
-function MarginMarks({ summary }: { summary: PageSummary }) {
-  const local = summary.source === 'on_device'
-  const marks = [local ? 'device' : 'cloud', seconds(summary.totalMs), dataSize(summary.bytes)]
-  return (
-    <div className="absolute left-0 top-0" aria-label={`Ran ${local ? 'on this device' : 'in the cloud'}, took ${seconds(summary.totalMs)}, used ${dataSize(summary.bytes)} of data`}>
-      {marks.map((mark, index) => (
-        <span
-          key={mark + index}
-          className={`margin-note ${index === 0 ? (local ? 'text-local' : 'text-cloud') : ''}`}
-          style={{ top: `calc(var(--line) * ${index})` }}
-        >
-          {mark}
-        </span>
-      ))}
-    </div>
-  )
-}
-
-function useElapsed(since: number | null): number {
-  const [now, setNow] = useState(() => Date.now())
-  useEffect(() => {
-    if (since === null) return
-    const timer = window.setInterval(() => setNow(Date.now()), 500)
-    return () => window.clearInterval(timer)
-  }, [since])
-  return since === null ? 0 : Math.max(0, now - since)
-}
-
-const pillButton =
-  'inline-flex h-[calc(var(--line)-6px)] items-center rounded-full bg-ink px-4 font-sans text-[0.85rem] font-[620] text-sheet transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40'
-const textButton = 'font-sans text-[0.82rem] font-[620] text-ink underline decoration-margin decoration-2 underline-offset-4'
 
 export function SummarySection({
   documentId,
@@ -103,9 +30,11 @@ export function SummarySection({
   online: boolean
   deviceStatus: OnDeviceStatus | null
 }) {
-  const key = summaryKey(documentId, page.number)
-  const job = useSummaryJob(key)
+  const key = summaryJobKey(documentId, page.number)
+  const job = useJob<PageSummary>(key)
+  const runOn = useRunOn()
   const [saved, setSaved] = useState<{ key: string; summary: PageSummary | null } | null>(null)
+  const [draft, setDraft] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -117,102 +46,127 @@ export function SummarySection({
     }
   }, [documentId, page.number, key])
 
-  const running = job?.status === 'running' ? job : null
-  const elapsed = useElapsed(running ? running.startedAt : null)
-  const usable = hasUsableText(page)
-  const savedSummary = saved?.key === key ? saved.summary : null
-  const summary = job?.status === 'done' ? job.summary : savedSummary
   const loaded = saved?.key === key
+  const summary = job?.status === 'done' ? job.result : loaded ? saved.summary : null
+  const usable = hasUsableText(page)
+  const preview = previewRun({
+    task: 'summarise',
+    runOn,
+    online,
+    deviceStatus,
+    prompt: buildSummaryPrompt({ pageText: page.text, title, page: page.number }),
+  })
 
-  const start = () => void summarisePage({ documentId, title, page: page.number, pageText: page.text })
+  const start = () => {
+    setDraft(null)
+    void summarisePage({ documentId, title, page: page.number, pageText: page.text, force: forcedTarget(runOn) })
+  }
 
-  const decision = decide({ task: 'summarise', onDeviceStatus: deviceStatus, online })
-  const preview = !decision
-    ? 'You are offline, and this browser cannot run AI on the device.'
-    : decision.target === 'on_device'
-      ? 'Runs on this laptop and uses no data.'
-      : `Runs in the cloud and uses about ${dataSize(estimateCloudBytesFor(buildSummaryPrompt({ pageText: page.text, title, page: page.number })), { approximate: false })} of data.`
+  const saveEdit = async () => {
+    if (!summary || draft === null) return
+    const text = draft.trim()
+    if (!text) return
+    const updated = await savePageSummary({ ...summary, text, edited: true })
+    dismissJob(key)
+    setSaved({ key, summary: updated })
+    setDraft(null)
+  }
+
+  let body
+  if (!usable) {
+    body = (
+      <Row>
+        <p className="on-lines font-sans text-[0.88rem] text-pencil">There is no text on this page to summarise.</p>
+      </Row>
+    )
+  } else if (job?.status === 'running') {
+    body = <Working target={job.target} startedAt={job.startedAt} />
+  } else if (job?.status === 'error') {
+    body = (
+      <>
+        <Row note="error" noteClass="text-margin">
+          <p className="on-lines font-sans text-[0.88rem] text-margin">{job.message}</p>
+        </Row>
+        <Row>
+          <p className="on-lines">
+            <button type="button" onClick={start} className={textButton} disabled={preview.blocked}>
+              Try again
+            </button>
+          </p>
+        </Row>
+      </>
+    )
+  } else if (summary && draft !== null) {
+    body = (
+      <>
+        <Row note="you" noteClass="text-pen">
+          <textarea
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            aria-label="Edit the summary"
+            autoFocus
+            className={penField}
+            style={{ minHeight: 'calc(var(--line) * 3)' }}
+          />
+        </Row>
+        <Row>
+          <p className="on-lines flex items-center gap-4">
+            <button type="button" onClick={() => void saveEdit()} className={pillButton}>
+              Save summary
+            </button>
+            <button type="button" onClick={() => setDraft(null)} className={quietButton}>
+              Cancel
+            </button>
+          </p>
+        </Row>
+      </>
+    )
+  } else if (summary) {
+    body = (
+      <>
+        <div className="relative" style={{ minHeight: `calc(var(--line) * ${summary.edited ? 4 : 3})` }}>
+          <MarginMarks source={summary.source} totalMs={summary.totalMs} bytes={summary.bytes} edited={summary.edited} />
+          <div className="past-margin pr-5 sm:pr-8">
+            <AiText text={summary.text} />
+          </div>
+        </div>
+        <Row>
+          <p className="on-lines flex flex-wrap items-baseline gap-x-4">
+            <button type="button" onClick={() => setDraft(toEditable(summary.text))} className={textButton}>
+              Edit
+            </button>
+            <button type="button" onClick={start} className={quietButton} disabled={preview.blocked}>
+              Summarise again
+            </button>
+          </p>
+        </Row>
+      </>
+    )
+  } else if (loaded) {
+    body = (
+      <>
+        <Row>
+          <p className="on-lines">
+            <button type="button" onClick={start} disabled={preview.blocked} className={pillButton}>
+              Summarise this page
+            </button>
+          </p>
+        </Row>
+        <Row>
+          <p className={`on-lines font-sans text-[0.8rem] ${preview.blocked ? 'text-margin' : 'text-pencil'}`}>{preview.text}</p>
+        </Row>
+      </>
+    )
+  } else {
+    body = <div style={{ height: 'var(--line)' }} />
+  }
 
   return (
     <section aria-label="Summary" aria-live="polite">
       <Row note={<span className="figures">p.&nbsp;{page.number}</span>}>
-        <p className="on-lines eyebrow">Summary</p>
+        <h2 className="on-lines eyebrow">Summary</h2>
       </Row>
-
-      {!usable ? (
-        <Row>
-          <p className="on-lines text-[0.88rem] text-pencil">There is no text on this page to summarise.</p>
-        </Row>
-      ) : running ? (
-        <div className="relative">
-          <span className={`margin-note ${running.target === 'on_device' ? 'text-local' : running.target ? 'text-cloud' : ''}`}>
-            {running.target === 'on_device' ? 'device' : running.target ? 'cloud' : '…'}
-          </span>
-          <span className="margin-note figures" style={{ top: 'var(--line)' }}>
-            {seconds(elapsed)}
-          </span>
-          <div className="past-margin pr-5 sm:pr-8">
-            {running.text ? (
-              <SummaryText text={running.text} streaming />
-            ) : (
-              <p className="on-lines font-sans text-[0.88rem] text-pencil">
-                {running.target === 'on_device'
-                  ? 'Writing on this laptop. The first words can take a few seconds.'
-                  : running.target
-                    ? 'Writing in the cloud…'
-                    : 'Choosing where to run…'}
-              </p>
-            )}
-          </div>
-        </div>
-      ) : job?.status === 'error' ? (
-        <>
-          <Row note="error" noteClass="text-margin">
-            <p className="on-lines font-sans text-[0.88rem] text-margin">{job.message}</p>
-          </Row>
-          <Row>
-            <p className="on-lines">
-              <button type="button" onClick={start} className={textButton} disabled={!decision}>
-                Try again
-              </button>
-            </p>
-          </Row>
-        </>
-      ) : summary ? (
-        <>
-          <div className="relative" style={{ minHeight: 'calc(var(--line) * 3)' }}>
-            <MarginMarks summary={summary} />
-            <div className="past-margin pr-5 sm:pr-8">
-              <SummaryText text={summary.text} streaming={false} />
-            </div>
-          </div>
-          <Row>
-            <p className="on-lines flex flex-wrap items-baseline gap-x-4 font-sans text-[0.8rem] text-pencil">
-              <button type="button" onClick={start} className={textButton} disabled={!decision}>
-                Summarise again
-              </button>
-              <span>Saved on this laptop</span>
-            </p>
-          </Row>
-        </>
-      ) : loaded ? (
-        <>
-          <Row>
-            <p className="on-lines">
-              <button type="button" onClick={start} disabled={!decision} className={pillButton}>
-                Summarise this page
-              </button>
-            </p>
-          </Row>
-          <Row>
-            <p className="on-lines font-sans text-[0.8rem] text-pencil">{preview}</p>
-          </Row>
-        </>
-      ) : (
-        <Row>
-          <p className="on-lines" />
-        </Row>
-      )}
+      {body}
     </section>
   )
 }

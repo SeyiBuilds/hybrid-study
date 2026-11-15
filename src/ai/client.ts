@@ -203,7 +203,7 @@ export function describeError(error: unknown): string {
   if (error instanceof AIError) {
     const message = error.message
     if (error.code === 'api-not-enabled' || /genai config not found/i.test(message)) {
-      return 'The cloud model is not set up for this Firebase project yet (or was set up in the last few minutes). In Firebase console, open AI Services > AI Logic, click Get started and choose the Gemini Developer API, then try again.'
+      return 'The cloud model turned this request down. Usually this browser is not verified by App Check yet (in development, add its debug token in Firebase console > App Check > Manage debug tokens). Otherwise, AI Logic is not set up for the project: open AI Services > AI Logic and choose the Gemini Developer API.'
     }
     if (/app.?check/i.test(message) || /\[(401|403)\b/.test(message)) {
       return 'The cloud request was rejected (App Check or permissions). In development, copy the App Check debug token from the browser console into Firebase console > App Check > Apps > Manage debug tokens, then reload.'

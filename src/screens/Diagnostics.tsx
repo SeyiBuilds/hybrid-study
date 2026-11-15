@@ -95,9 +95,9 @@ export function Diagnostics({
       const result = await ask(prompt, {
         task: 'connection-test',
         force: target,
+        // Answers appear whole when ready, not typed out word by word.
         onText: (soFar) => {
           latest = soFar
-          setRuns((prev) => ({ ...prev, [target]: { phase: 'running', text: soFar } }))
         },
       })
       setRuns((prev) => ({ ...prev, [target]: { phase: 'done', result } }))

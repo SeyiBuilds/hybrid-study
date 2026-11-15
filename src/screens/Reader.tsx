@@ -1,13 +1,24 @@
-import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import type { OnDeviceStatus } from '../ai/client'
+import { AskSection } from '../components/AskSection'
+import { MarkToolbar, type ToolbarTarget } from '../components/MarkToolbar'
+import { NotesSection } from '../components/NotesSection'
+import { PdfPage, type PageSelection } from '../components/PdfPage'
+import { Gap, RunOnSwitch } from '../components/sheet'
 import { SummarySection } from '../components/SummarySection'
+import { newId } from '../lib/highlights'
 import {
+  deleteHighlight,
   getContent,
   getDocumentSummary,
+  listHighlights,
   saveDocument,
+  saveHighlight,
   touchDocument,
   type DocumentContent,
   type DocumentSummary,
+  type Highlight,
+  type HighlightColor,
 } from '../lib/library'
 import {
   closePdf,
@@ -15,7 +26,6 @@ import {
   hasUsableText,
   openPdf,
   pageLabel,
-  renderPage,
   type PageText,
   type PDFDocumentProxy,
 } from '../lib/pdf'
@@ -69,60 +79,6 @@ function useDocument(id: string): LoadState {
   return state
 }
 
-/** Renders the current PDF page at the width of its column. */
-function PageCanvas({ pdf, pageNumber }: { pdf: PDFDocumentProxy; pageNumber: number }) {
-  const wrapRef = useRef<HTMLDivElement>(null)
-  const canvasRef = useRef<HTMLCanvasElement>(null)
-  const [width, setWidth] = useState(0)
-  const [rendering, setRendering] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    const wrap = wrapRef.current
-    if (!wrap) return
-    let frame = 0
-    const observer = new ResizeObserver(([entry]) => {
-      cancelAnimationFrame(frame)
-      frame = requestAnimationFrame(() => setWidth(Math.min(Math.floor(entry.contentRect.width), 900)))
-    })
-    observer.observe(wrap)
-    return () => {
-      cancelAnimationFrame(frame)
-      observer.disconnect()
-    }
-  }, [])
-
-  useEffect(() => {
-    const canvas = canvasRef.current
-    if (!canvas || width === 0) return
-    setRendering(true)
-    setError(null)
-    const job = renderPage(pdf, pageNumber, canvas, width)
-    job.done
-      .then(() => setRendering(false))
-      .catch(() => {
-        setError('This page could not be drawn.')
-        setRendering(false)
-      })
-    return () => job.cancel()
-  }, [pdf, pageNumber, width])
-
-  return (
-    <div ref={wrapRef} className="w-full">
-      <div className="relative mx-auto w-fit">
-        <canvas
-          ref={canvasRef}
-          aria-label={`Page ${pageNumber}`}
-          className={`block bg-white shadow-[0_1px_0_var(--color-rule),0_22px_48px_-28px_rgb(24_40_72/0.55)] transition-opacity duration-150 ${
-            rendering ? 'opacity-60' : 'opacity-100'
-          }`}
-        />
-        {error && <p className="absolute inset-x-0 top-8 text-center text-sm text-margin">{error}</p>}
-      </div>
-    </div>
-  )
-}
-
 const LIST_SPLIT = /^(\S{1,5})\s+([\s\S]*)$/
 
 function Block({ block, first }: { block: TextBlock; first: boolean }) {
@@ -160,29 +116,44 @@ function Block({ block, first }: { block: TextBlock; first: boolean }) {
   )
 }
 
-function PageTextSheet({ page, top }: { page: PageText; top: ReactNode }) {
+/** The cleaned-up text the AI reads, folded away until the student wants to check it. */
+function PageTextSection({ page }: { page: PageText }) {
+  const [open, setOpen] = useState(false)
   const usable = hasUsableText(page)
 
   return (
-    <article className="ruled relative min-h-full pb-[calc(var(--line)*3)]" aria-label={`Study sheet for page ${page.number}`}>
-      <div style={{ paddingTop: 'var(--line)' }}>{top}</div>
-
-      <div className="relative" style={{ marginTop: 'var(--line)' }}>
+    <section aria-label="Text the AI reads">
+      <div className="relative">
         <span className="margin-note figures">{usable ? `${page.words} w` : ''}</span>
-        <p className="past-margin on-lines eyebrow pr-5">What the AI reads</p>
+        <p className="past-margin on-lines flex items-baseline gap-4 pr-5">
+          <span className="eyebrow">What the AI reads</span>
+          {usable && (
+            <button
+              type="button"
+              onClick={() => setOpen((value) => !value)}
+              aria-expanded={open}
+              className="font-sans text-[0.8rem] font-[560] text-pencil hover:text-ink"
+            >
+              {open ? 'Hide' : 'Show'}
+            </button>
+          )}
+        </p>
       </div>
-
       <div className="past-margin reading pr-5 sm:pr-8">
-        {usable ? (
+        {!usable ? (
+          <p className="on-lines text-pencil">
+            This page has no selectable text. It is probably a scanned image or a picture of a slide, so summaries,
+            questions and highlights skip it.
+          </p>
+        ) : open ? (
           page.blocks.map((block, index) => <Block key={index} block={block} first={index === 0} />)
         ) : (
-          <p className="on-lines text-pencil">
-            This page has no selectable text. It is probably a scanned image or a picture of a slide. You can read it on
-            the left, but summaries and quizzes need text, so they skip this page.
+          <p className="on-lines font-sans text-[0.82rem] text-pencil">
+            The page&apos;s text, cleaned up from the PDF. Summaries and answers are based on it.
           </p>
         )}
       </div>
-    </article>
+    </section>
   )
 }
 
@@ -297,12 +268,31 @@ function ReaderView({
   const total = content.pages.length
   const current = Math.min(Math.max(1, requestedPage ?? summary.lastPage ?? 1), total)
   const page = content.pages[current - 1]
-  const [mobileView, setMobileView] = useState<'page' | 'text'>('page')
+  const [mobileView, setMobileView] = useState<'page' | 'study'>('page')
+  const [highlights, setHighlights] = useState<{ page: number; list: Highlight[] }>({ page: 0, list: [] })
+  const [selection, setSelection] = useState<PageSelection | null>(null)
+  const [toolbar, setToolbar] = useState<ToolbarTarget | null>(null)
+  const [flashId, setFlashId] = useState<string | null>(null)
+  const [focusNoteId, setFocusNoteId] = useState<string | null>(null)
+  const [askPrefill, setAskPrefill] = useState<{ quote: string; nonce: number } | null>(null)
+  const pageHighlights = highlights.page === current ? highlights.list : []
 
   const go = (n: number) => {
     const next = Math.min(Math.max(1, n), total)
     if (next !== current) navigate(routes.reader(summary.id, next), { replace: true })
   }
+
+  useEffect(() => {
+    let cancelled = false
+    listHighlights(summary.id, current).then((list) => {
+      if (!cancelled) setHighlights({ page: current, list })
+    })
+    return () => {
+      cancelled = true
+      setToolbar(null)
+      setSelection(null)
+    }
+  }, [summary.id, current])
 
   // Remember the page so the library can reopen here.
   useEffect(() => {
@@ -322,7 +312,93 @@ function ReaderView({
     return () => window.removeEventListener('keydown', onKey)
   })
 
-  const tab = (view: 'page' | 'text', label: string) => (
+  const onSelection = useCallback((next: PageSelection | null) => {
+    setSelection(next)
+    setToolbar((open) => {
+      if (next) return { kind: 'selection', anchor: next.anchor }
+      return open?.kind === 'selection' ? null : open
+    })
+  }, [])
+
+  const closeToolbar = useCallback(() => setToolbar(null), [])
+
+  const storeHighlight = (highlight: Highlight) => {
+    setHighlights((state) =>
+      state.page !== highlight.page
+        ? state
+        : {
+            page: state.page,
+            list: state.list.some((h) => h.id === highlight.id)
+              ? state.list.map((h) => (h.id === highlight.id ? highlight : h))
+              : [...state.list, highlight].sort(
+                  (a, b) => (a.rects[0]?.y ?? 0) - (b.rects[0]?.y ?? 0) || (a.rects[0]?.x ?? 0) - (b.rects[0]?.x ?? 0),
+                ),
+          },
+    )
+    void saveHighlight(highlight)
+  }
+
+  const removeHighlight = (id: string) => {
+    setHighlights((state) => ({ ...state, list: state.list.filter((h) => h.id !== id) }))
+    void deleteHighlight(id)
+  }
+
+  /** Turns the current selection into a highlight and returns it. */
+  const highlightSelection = (color: HighlightColor): Highlight | null => {
+    if (!selection) return null
+    const now = Date.now()
+    const highlight: Highlight = {
+      id: newId(),
+      documentId: summary.id,
+      page: current,
+      color,
+      text: selection.text,
+      rects: selection.rects,
+      note: '',
+      createdAt: now,
+      updatedAt: now,
+    }
+    storeHighlight(highlight)
+    window.getSelection()?.removeAllRanges()
+    setSelection(null)
+    return highlight
+  }
+
+  const onToolbarHighlight = (color: HighlightColor) => {
+    if (toolbar?.kind === 'highlight') storeHighlight({ ...toolbar.highlight, color, updatedAt: Date.now() })
+    else highlightSelection(color)
+    setToolbar(null)
+  }
+
+  const onToolbarNote = () => {
+    const highlight = toolbar?.kind === 'highlight' ? toolbar.highlight : highlightSelection('yellow')
+    setToolbar(null)
+    if (!highlight) return
+    setMobileView('study')
+    setFocusNoteId(null)
+    window.requestAnimationFrame(() => setFocusNoteId(highlight.id))
+  }
+
+  const onToolbarAsk = () => {
+    const quote = toolbar?.kind === 'highlight' ? toolbar.highlight.text : selection?.text
+    setToolbar(null)
+    if (!quote) return
+    setMobileView('study')
+    setAskPrefill({ quote, nonce: Date.now() })
+  }
+
+  const onToolbarRemove = () => {
+    if (toolbar?.kind === 'highlight') removeHighlight(toolbar.highlight.id)
+    setToolbar(null)
+  }
+
+  const showHighlight = (id: string) => {
+    setMobileView('page')
+    setFlashId(null)
+    window.requestAnimationFrame(() => setFlashId(id))
+  }
+
+  const tab = (view: 'page' | 'study', label: string) => (
     <button
       type="button"
       onClick={() => setMobileView(view)}
@@ -336,33 +412,41 @@ function ReaderView({
   )
 
   return (
-    <div className="mx-auto max-w-[1600px] lg:grid lg:h-[calc(100dvh-3.5rem)] lg:grid-cols-[minmax(0,1fr)_minmax(20rem,26rem)] xl:grid-cols-[13rem_minmax(0,1fr)_minmax(22rem,30rem)]">
+    <div className="mx-auto max-w-[1600px] lg:grid lg:h-[calc(100dvh-3.5rem)] lg:grid-cols-[minmax(0,1fr)_minmax(21rem,27rem)] xl:grid-cols-[13rem_minmax(0,1fr)_minmax(23rem,31rem)]">
       <aside className="hidden overflow-y-auto border-r border-rule xl:block">
         <PageIndex pages={content.pages} current={current} onSelect={go} />
       </aside>
 
-      <div className="flex gap-1 rounded-full bg-desk p-1 lg:hidden mx-4 mt-4 border border-rule">
+      <div className="mx-4 mt-4 flex gap-1 rounded-full border border-rule bg-desk p-1 lg:hidden">
         {tab('page', 'Page')}
-        {tab('text', 'Study')}
+        {tab('study', 'Study')}
       </div>
 
       <section
         className={`flex-col gap-5 overflow-y-auto px-4 py-6 sm:px-8 lg:flex ${mobileView === 'page' ? 'flex' : 'hidden'}`}
         aria-label="Page view"
       >
-        <PageCanvas pdf={pdf} pageNumber={current} />
+        <PdfPage
+          pdf={pdf}
+          pageNumber={current}
+          highlights={pageHighlights}
+          flashId={flashId}
+          onSelection={onSelection}
+          onHighlightClick={(highlight, anchor) => setToolbar({ kind: 'highlight', highlight, anchor })}
+        />
         <PageControls current={current} total={total} onGo={go} />
       </section>
 
       <section
         className={`overflow-y-auto border-rule px-4 pb-6 lg:block lg:border-l lg:px-0 lg:pb-0 ${
-          mobileView === 'text' ? 'block pt-4' : 'hidden'
+          mobileView === 'study' ? 'block pt-4' : 'hidden'
         }`}
         aria-label="Study sheet"
       >
-        <PageTextSheet
-          page={page}
-          top={
+        <article className="ruled relative min-h-full" aria-label={`Study sheet for page ${current}`}>
+          <div style={{ paddingTop: 'var(--line)', paddingBottom: 'calc(var(--line) * 3)' }}>
+            <RunOnSwitch online={connectivity.online} deviceStatus={connectivity.deviceStatus} />
+            <Gap />
             <SummarySection
               documentId={summary.id}
               title={summary.title}
@@ -370,12 +454,44 @@ function ReaderView({
               online={connectivity.online}
               deviceStatus={connectivity.deviceStatus}
             />
-          }
-        />
+            <Gap />
+            <AskSection
+              documentId={summary.id}
+              title={summary.title}
+              page={page}
+              online={connectivity.online}
+              deviceStatus={connectivity.deviceStatus}
+              prefill={askPrefill}
+            />
+            <Gap />
+            <NotesSection
+              documentId={summary.id}
+              page={current}
+              highlights={pageHighlights}
+              focusNoteId={focusNoteId}
+              onChangeHighlight={storeHighlight}
+              onRemoveHighlight={removeHighlight}
+              onShowHighlight={showHighlight}
+            />
+            <Gap />
+            <PageTextSection page={page} />
+          </div>
+        </article>
         <div className="py-4 lg:hidden">
           <PageControls current={current} total={total} onGo={go} />
         </div>
       </section>
+
+      {toolbar && (
+        <MarkToolbar
+          target={toolbar}
+          onHighlight={onToolbarHighlight}
+          onNote={onToolbarNote}
+          onAsk={onToolbarAsk}
+          onRemove={onToolbarRemove}
+          onClose={closeToolbar}
+        />
+      )}
     </div>
   )
 }

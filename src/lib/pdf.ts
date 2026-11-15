@@ -2,7 +2,7 @@
  * PDF loading, per-page text extraction and page rendering with pdf.js.
  * The worker is bundled with the app (no CDN), so this works offline.
  */
-import { getDocument, GlobalWorkerOptions, type PDFDocumentProxy } from 'pdfjs-dist'
+import { getDocument, GlobalWorkerOptions, TextLayer, type PDFDocumentProxy } from 'pdfjs-dist'
 import type { TextItem } from 'pdfjs-dist/types/src/display/api'
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 import { removeRunningLines, toPageText, type PageText, type RawLine } from './pageText'
@@ -70,21 +70,24 @@ export async function extractPages(
 }
 
 /**
- * Renders one page into a canvas at the given CSS width, sharp on high-DPI screens.
- * Returns a cancel function for when the page changes before rendering finishes.
+ * Renders one page at the given CSS width: the image into a canvas (sharp on high-DPI
+ * screens) and an invisible, selectable text layer on top, so students can select and
+ * highlight words on the page itself.
+ * Returns the page scale and a cancel function for when the page changes mid-render.
  */
 export function renderPage(
   doc: PDFDocumentProxy,
   pageNumber: number,
   canvas: HTMLCanvasElement,
+  textLayerContainer: HTMLElement,
   cssWidth: number,
-): { done: Promise<void>; cancel: () => void } {
+): { done: Promise<{ scale: number }>; cancel: () => void } {
   let cancelled = false
-  let cancelRender: (() => void) | null = null
+  const cancellers: Array<() => void> = []
 
   const done = (async () => {
     const page = await doc.getPage(pageNumber)
-    if (cancelled) return
+    if (cancelled) return { scale: 1 }
     const base = page.getViewport({ scale: 1 })
     const scale = cssWidth / base.width
     const ratio = Math.min(window.devicePixelRatio || 1, 2)
@@ -96,19 +99,32 @@ export function renderPage(
     canvas.style.height = `${Math.floor(viewport.height / ratio)}px`
 
     const task = page.render({ canvas, viewport })
-    cancelRender = () => task.cancel()
+    cancellers.push(() => task.cancel())
     try {
       await task.promise
     } catch (error) {
       if ((error as { name?: string }).name !== 'RenderingCancelledException') throw error
+      return { scale }
     }
+    if (cancelled) return { scale }
+
+    // pdf.js sizes the text layer from --total-scale-factor on an ancestor.
+    textLayerContainer.replaceChildren()
+    const textLayer = new TextLayer({
+      textContentSource: page.streamTextContent(),
+      container: textLayerContainer,
+      viewport: page.getViewport({ scale }),
+    })
+    cancellers.push(() => textLayer.cancel())
+    await textLayer.render()
+    return { scale }
   })()
 
   return {
     done,
     cancel: () => {
       cancelled = true
-      cancelRender?.()
+      cancellers.forEach((cancel) => cancel())
     },
   }
 }

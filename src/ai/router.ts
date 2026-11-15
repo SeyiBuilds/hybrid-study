@@ -17,7 +17,7 @@ import {
   type Target,
 } from './client'
 
-export type Task = 'summarise' | 'connection-test'
+export type Task = 'summarise' | 'ask' | 'connection-test'
 
 export interface RouteDecision {
   target: Target
@@ -43,7 +43,7 @@ export class NoRouteError extends Error {
 
 /** Pure decision: also used to tell the student where a request will run before they press the button. */
 export function decide({ force, onDeviceStatus, online }: RouteInput): RouteDecision | null {
-  if (force) return { target: force, reason: `forced ${force === 'on_device' ? 'on-device' : 'cloud'}` }
+  if (force) return { target: force, reason: force === 'on_device' ? 'you chose this laptop' : 'you chose the cloud' }
   const deviceReady = onDeviceStatus === 'available'
   if (!online && !deviceReady) return null
   if (deviceReady) return { target: 'on_device', reason: online ? 'on-device ready' : 'offline' }

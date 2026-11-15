@@ -11,6 +11,35 @@ function trimPage(text: string): string {
   return `${text.slice(0, MAX_PAGE_CHARS)}\n[The rest of the page was cut to fit.]`
 }
 
+export function askPrompt({
+  pageText,
+  title,
+  page,
+  question,
+  quote,
+}: {
+  pageText: string
+  title: string
+  page: number
+  question: string
+  quote?: string
+}): string {
+  return [
+    'You help a university student understand their lecture notes.',
+    'Answer the question in plain English in at most 120 words. Use short bullet points starting with "- " only if they make the answer clearer.',
+    'Base the answer on the page text. If the page does not contain the answer, start with "Not on this page:" and answer briefly from general knowledge.',
+    '',
+    ...(quote ? ['The student highlighted these words:', '"""', quote.slice(0, 800), '"""', ''] : []),
+    `Question: ${question.slice(0, 600)}`,
+    '',
+    `Notes: ${title}, page ${page}`,
+    'Page text:',
+    '"""',
+    trimPage(pageText),
+    '"""',
+  ].join('\n')
+}
+
 export function summarisePrompt({ pageText, title, page }: { pageText: string; title: string; page: number }): string {
   return [
     'You help a university student revise from their lecture notes.',

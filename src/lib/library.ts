@@ -37,13 +37,66 @@ export interface PageSummary {
   /** Estimated mobile data used, in bytes (0 on-device). */
   bytes: number
   createdAt: number
+  /** True once the student has edited the AI's text. */
+  edited?: boolean
+}
+
+export type HighlightColor = 'yellow' | 'green' | 'pink'
+
+/** A rectangle on the page, as fractions (0 to 1) of the page width and height. */
+export interface HighlightRect {
+  x: number
+  y: number
+  w: number
+  h: number
+}
+
+export interface Highlight {
+  id: string
+  documentId: string
+  page: number
+  color: HighlightColor
+  /** The highlighted words, as selected. */
+  text: string
+  rects: HighlightRect[]
+  note: string
+  createdAt: number
+  updatedAt: number
+}
+
+export interface PageNote {
+  /** `${documentId}:${pageNumber}` */
+  key: string
+  documentId: string
+  page: number
+  text: string
+  updatedAt: number
+}
+
+export interface PageAnswer {
+  id: string
+  documentId: string
+  page: number
+  question: string
+  /** The highlighted words the question was about, if any. */
+  quote?: string
+  text: string
+  source: 'on_device' | 'in_cloud'
+  totalMs: number
+  bytes: number
+  createdAt: number
 }
 
 const DB_NAME = 'hybrid-study'
-const DB_VERSION = 2
+const DB_VERSION = 3
 const META = 'documents'
 const CONTENT = 'documentContent'
 const SUMMARIES = 'summaries'
+const HIGHLIGHTS = 'highlights'
+const NOTES = 'notes'
+const ANSWERS = 'answers'
+/** Stores holding per-page study material, each indexed by documentId and docPage. */
+const PAGE_STORES = [SUMMARIES, HIGHLIGHTS, NOTES, ANSWERS]
 
 let dbPromise: Promise<IDBDatabase> | null = null
 
@@ -54,9 +107,16 @@ function openDb(): Promise<IDBDatabase> {
       const db = request.result
       if (!db.objectStoreNames.contains(META)) db.createObjectStore(META, { keyPath: 'id' })
       if (!db.objectStoreNames.contains(CONTENT)) db.createObjectStore(CONTENT, { keyPath: 'id' })
-      if (!db.objectStoreNames.contains(SUMMARIES)) {
-        db.createObjectStore(SUMMARIES, { keyPath: 'key' }).createIndex('documentId', 'documentId')
+      const tx = request.transaction!
+      const ensure = (name: string, keyPath: string) => {
+        const store = db.objectStoreNames.contains(name) ? tx.objectStore(name) : db.createObjectStore(name, { keyPath })
+        if (!store.indexNames.contains('documentId')) store.createIndex('documentId', 'documentId')
+        if (!store.indexNames.contains('docPage')) store.createIndex('docPage', ['documentId', 'page'])
       }
+      ensure(SUMMARIES, 'key')
+      ensure(HIGHLIGHTS, 'id')
+      ensure(NOTES, 'key')
+      ensure(ANSWERS, 'id')
     }
     request.onsuccess = () => {
       const db = request.result
@@ -121,14 +181,21 @@ export async function listDocuments(): Promise<DocumentSummary[]> {
   return all.sort((a, b) => b.openedAt - a.openedAt)
 }
 
+/** Removes a document and everything written about it (summaries, highlights, notes, answers). */
 export async function deleteDocument(id: string): Promise<void> {
   const db = await openDb()
-  const tx = db.transaction([META, CONTENT, SUMMARIES], 'readwrite')
+  const tx = db.transaction([META, CONTENT, ...PAGE_STORES], 'readwrite')
   tx.objectStore(META).delete(id)
   tx.objectStore(CONTENT).delete(id)
-  const summaries = tx.objectStore(SUMMARIES)
-  const keys = await promisify(summaries.index('documentId').getAllKeys(id))
-  keys.forEach((key) => summaries.delete(key))
+  for (const name of PAGE_STORES) {
+    const store = tx.objectStore(name)
+    store.index('documentId').openKeyCursor(IDBKeyRange.only(id)).onsuccess = (event) => {
+      const cursor = (event.target as IDBRequest<IDBCursor | null>).result
+      if (!cursor) return
+      store.delete(cursor.primaryKey)
+      cursor.continue()
+    }
+  }
   await done(tx)
 }
 
@@ -160,4 +227,62 @@ export async function savePageSummary(summary: Omit<PageSummary, 'key'>): Promis
   tx.objectStore(SUMMARIES).put(stored)
   await done(tx)
   return stored
+}
+
+async function put<T>(storeName: string, value: T): Promise<T> {
+  const db = await openDb()
+  const tx = db.transaction(storeName, 'readwrite')
+  tx.objectStore(storeName).put(value)
+  await done(tx)
+  return value
+}
+
+async function remove(storeName: string, key: IDBValidKey): Promise<void> {
+  const db = await openDb()
+  const tx = db.transaction(storeName, 'readwrite')
+  tx.objectStore(storeName).delete(key)
+  await done(tx)
+}
+
+async function forPage<T>(storeName: string, documentId: string, page: number): Promise<T[]> {
+  const db = await openDb()
+  const index = db.transaction(storeName).objectStore(storeName).index('docPage')
+  return promisify(index.getAll([documentId, page]) as IDBRequest<T[]>)
+}
+
+export async function listHighlights(documentId: string, page: number): Promise<Highlight[]> {
+  const all = await forPage<Highlight>(HIGHLIGHTS, documentId, page)
+  return all.sort((a, b) => (a.rects[0]?.y ?? 0) - (b.rects[0]?.y ?? 0) || (a.rects[0]?.x ?? 0) - (b.rects[0]?.x ?? 0))
+}
+
+export function saveHighlight(highlight: Highlight): Promise<Highlight> {
+  return put(HIGHLIGHTS, highlight)
+}
+
+export function deleteHighlight(id: string): Promise<void> {
+  return remove(HIGHLIGHTS, id)
+}
+
+export async function getNote(documentId: string, page: number): Promise<PageNote | undefined> {
+  const db = await openDb()
+  return promisify(
+    db.transaction(NOTES).objectStore(NOTES).get(summaryKey(documentId, page)) as IDBRequest<PageNote | undefined>,
+  )
+}
+
+export function saveNote(documentId: string, page: number, text: string): Promise<PageNote> {
+  return put(NOTES, { key: summaryKey(documentId, page), documentId, page, text, updatedAt: Date.now() })
+}
+
+export async function listAnswers(documentId: string, page: number): Promise<PageAnswer[]> {
+  const all = await forPage<PageAnswer>(ANSWERS, documentId, page)
+  return all.sort((a, b) => a.createdAt - b.createdAt)
+}
+
+export function saveAnswer(answer: PageAnswer): Promise<PageAnswer> {
+  return put(ANSWERS, answer)
+}
+
+export function deleteAnswer(id: string): Promise<void> {
+  return remove(ANSWERS, id)
 }
