@@ -2,6 +2,49 @@
 
 What was built each day, what broke, and what we changed and why. Newest day first.
 
+## Mon 16 Nov 2026
+
+### Built
+- **Summarise confirmed in Chrome** on the development laptop, on-device.
+- **Highlight on the page itself.**
+  - pdf.js's text layer now sits over each rendered page, so words can be selected like in any PDF reader.
+  - A small toolbar over a selection offers three highlighter colours (yellow, green, pink), "Add note" and "Ask".
+  - Clicking an existing highlight lets you recolour it, add or edit its note, ask about it, or remove it.
+  - Highlights are stored as rectangles relative to the page, so they stay in place at any size.
+- **A study sheet for every page.** The ruled sheet beside the page now holds:
+  - the "Run AI on" switch
+  - the summary
+  - "Ask about this page"
+  - "My notes"
+  - the page's highlights with their notes
+  - the text the AI reads, folded away until you open it
+- **The student's own writing** (questions, notes, edited summaries) is set in biro-blue and marked "you" in the margin. AI answers carry where they ran, the time and the data used.
+- **Editable summaries.** "Edit" turns a summary into your own words, and the margin then marks it "edited".
+- **Ask about this page.** Type a question, or press "Ask" on a highlight to attach those words. Answers stay on the sheet.
+- **Run AI on: Auto / This laptop / Cloud.** One switch for the whole sheet. Auto lets the router decide, and each section says where a request will run and roughly what it costs before you press the button.
+- **`start-dev.cmd`.** Double-click it to run the dev server in its own window.
+
+### What broke
+- **Answers were typed out word by word.** On a CPU-only laptop that made on-device answers feel slow and unsettled.
+- **The ask-a-question test seemed to have disappeared.** It had moved to "Connection details" behind the status indicator, where it was easy to miss.
+- **The dev server kept stopping.** Servers started from a coding session (a preview, a terminal tab, a background process) are stopped when that session or command ends. One server also hung after its output pipe closed.
+- **The built-in browser pane couldn't draw while hidden,** so it couldn't be used to check rendering and selection.
+- **Unverified browsers get a misleading error.** Two test browsers whose App Check debug tokens weren't registered both got `Firebase AI Logic genai config not found` from the cloud, while the registered Chrome works. The app's message blamed only the AI Logic setup.
+
+### What we changed and why
+- **Whole answers.** Generation still streams under the hood, to measure time to the first token, but answers appear whole when ready. While waiting, the margin shows where it's running and a clock, and a thin line is drawn along the paper.
+- **Asking moved into the reader,** as "Ask about this page", with the Run AI on switch to choose where it runs.
+- **New storage.** The database moved to version 3, adding stores for highlights, notes and answers, each indexed by document and page. Removing a document clears everything written about it.
+- **Text layer CSS.** Only the rules the text layer needs were copied from pdf.js's viewer stylesheet (also Apache 2.0), rather than loading the whole stylesheet.
+- **Page sizing** reacts to size changes directly instead of waiting an extra animation frame.
+- **Testing.** Highlighting, notes and asking were checked end to end by driving the installed Chrome headless with a throwaway profile: select, highlight, note, ask, then check the database.
+- **The "genai config not found" message** now names both likely causes: an unverified App Check token, or AI Logic not set up.
+
+### Still open
+- Seyi to try highlighting, notes and asking in Chrome, on-device and in the cloud.
+- Highlights on scanned pages: there's no text layer to select, so these pages can't be highlighted yet.
+- Quiz step next.
+
 ## Sun 15 Nov 2026
 
 ### Built
