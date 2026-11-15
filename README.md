@@ -4,7 +4,13 @@ A study companion for students with patchy, expensive internet. Open a lecture P
 
 Built for the [#BuildHybridAI 2026 hackathon](https://firebasehybridaihackathon.devpost.com/) with [Firebase AI Logic](https://firebase.google.com/docs/ai-logic/hybrid-on-device-inference) hybrid inference (Gemini Nano in Chrome + Gemini in the cloud).
 
-> **Status:** early build. The current app is a connection test: one button sends a prompt only on-device, the other only to the cloud, and each answer shows where it ran and how long it took.
+> **Status:** in active development. Working now: open a lecture PDF, read it page by page with the extracted text beside each page, and reopen it later offline. Summaries and quizzes are next. See [BUILD_LOG.md](BUILD_LOG.md) for progress.
+
+## Features
+
+- **PDF reader.** Open or drop a PDF. Each page is shown next to the exact text the AI will read. Pages that are scanned images are flagged.
+- **Kept on your device.** Documents are stored in the browser (IndexedDB), reopen offline, and remember the page you were on. Nothing is uploaded when you open a file.
+- **Connection details.** A built-in check sends the same question to Gemini Nano in Chrome and to Gemini in the cloud, showing where each answer ran and how long it took.
 
 ## How Firebase AI Logic is used
 
@@ -75,15 +81,21 @@ Built for the [#BuildHybridAI 2026 hackathon](https://firebasehybridaihackathon.
 
 ```
 src/
-  ai/client.ts   Firebase AI Logic models, on-device availability, streaming
-  ai/router.ts   Per-request on-device vs cloud decision
-  firebase.ts    Firebase app + App Check
-  App.tsx        Connection test page
+  ai/client.ts            Firebase AI Logic models, on-device availability, streaming
+  ai/router.ts            Per-request on-device vs cloud decision
+  firebase.ts             Firebase app + App Check
+  lib/pdf.ts              pdf.js loading, per-page text extraction, page rendering
+  lib/importPdf.ts        Opening a PDF file into the on-device library
+  lib/library.ts          IndexedDB storage for documents and their page text
+  screens/Library.tsx     Open a PDF, list documents on this device
+  screens/Reader.tsx      Page view, page index and extracted text
+  screens/Diagnostics.tsx On-device vs cloud connection check
+  index.css               Design tokens and the ruled-sheet styles
 ```
 
 ## Tech stack
 
-Vite, React, TypeScript, Tailwind CSS, Firebase JS SDK (`firebase/ai`, App Check), pdf.js.
+Vite, React, TypeScript, Tailwind CSS, Firebase JS SDK (`firebase/ai`, App Check), pdf.js. Fonts (Archivo, Literata) are self-hosted from the build, and nothing loads from third-party CDNs.
 
 ## License
 
