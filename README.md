@@ -57,6 +57,8 @@ Built for the [#BuildHybridAI 2026 hackathon](https://firebasehybridaihackathon.
 
    Open http://localhost:5173 in Chrome.
 
+   On Windows, if PowerShell says "running scripts is disabled on this system", use `npm.cmd` instead of `npm` (for example `npm.cmd run dev`).
+
 5. **Register the App Check debug token**
    - Open Chrome DevTools (F12) > Console and copy the value after `Firebase App Check debug token:`.
    - In the Firebase console, go to **Security > App Check > Apps**, open the menu next to your web app, choose **Manage debug tokens** and add it.

@@ -43,6 +43,7 @@ What was built each day, what broke, and what we changed and why. Newest day fir
   - contents dot leaders and page numbers ran into the next entry ("2Contents")
   - every PDF line became its own line
 - Adding the summaries store needed a database upgrade, and it was blocked by a tab still holding the old version open, so the library showed nothing.
+- The local app stopped opening. The dev server had been started inside a coding session and stopped when that session restarted. Restarting it from PowerShell then failed, because script execution is disabled on the development laptop and `npm` is a PowerShell script there.
 - In the built-in test browser (no Gemini Nano, unregistered App Check token), cloud calls still return `Firebase AI Logic genai config not found`. Not yet explained, because the same call worked in Chrome.
 
 ### What we changed and why
@@ -64,6 +65,7 @@ What was built each day, what broke, and what we changed and why. Newest day fir
   - The text panel draws headings in Archivo and uses fainter ruled lines, so the words read first.
 - **Database upgrades:** open database connections now close themselves when a newer version asks to upgrade.
 - **On-device order:** on-device requests run one at a time. The SDK closes the previous on-device session when it starts a new one, so overlapping requests would cut each other off.
+- **Dev server:** it now runs in its own terminal, using `npm.cmd`, which bypasses the blocked PowerShell script without changing any security setting. The README notes this for other Windows users.
 - **Data estimates:** cloud data use is estimated from the prompt and response size plus HTTP overhead. It's a rough figure, to be refined with the badges and data-saved counter.
 
 ### Still open
