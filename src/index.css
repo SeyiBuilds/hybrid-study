@@ -1,14 +1,161 @@
+@import '@fontsource-variable/archivo/wdth.css';
+@import '@fontsource-variable/literata/opsz.css';
+@import '@fontsource-variable/literata/opsz-italic.css';
 @import 'tailwindcss';
 
+/*
+ * Hybrid Study design tokens.
+ * Borrowed from a biro on an exercise book: blue-black ink, faint blue rules,
+ * a red margin line, cool paper, and highlighter yellow for selections.
+ */
 @theme {
-  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  --font-mono: ui-monospace, 'Cascadia Code', 'Consolas', monospace;
+  --font-sans: 'Archivo Variable', system-ui, 'Segoe UI', Roboto, sans-serif;
+  --font-read: 'Literata Variable', Georgia, 'Times New Roman', serif;
+
+  --color-desk: #e7eae9;
+  --color-sheet: #fafbf9;
+  --color-ink: #182848;
+  --color-pencil: #5d6778;
+  --color-rule: #c8d4e4;
+  --color-margin: #d24537;
+  --color-local: #2c7552;
+  --color-cloud: #2a6fae;
+  --color-highlight: #f5e17a;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-desk: #0e131d;
+    --color-sheet: #151b28;
+    --color-ink: #e3e7ef;
+    --color-pencil: #95a1b4;
+    --color-rule: #263146;
+    --color-margin: #e0675c;
+    --color-local: #63c093;
+    --color-cloud: #6daee6;
+    --color-highlight: #6b5d1a;
+  }
 }
 
 :root {
   color-scheme: light dark;
 }
 
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
 body {
-  @apply bg-slate-50 text-slate-900 antialiased dark:bg-slate-950 dark:text-slate-100;
+  background-color: var(--color-desk);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-optical-sizing: auto;
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: 'tnum' 0;
+}
+
+::selection {
+  background-color: var(--color-highlight);
+  color: var(--color-ink);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-ink);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+@layer components {
+  /* Condensed Archivo for headings: used sparingly. */
+  .display {
+    font-family: var(--font-sans);
+    font-stretch: 78%;
+    font-weight: 680;
+    letter-spacing: -0.01em;
+    line-height: 0.98;
+  }
+
+  .eyebrow {
+    font-family: var(--font-sans);
+    font-stretch: 92%;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-pencil);
+  }
+
+  .figures {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /*
+   * The exercise-book sheet: ruled lines every --line, and a red margin rule at --margin.
+   * Lines scroll with the content (background-attachment: local).
+   */
+  .ruled {
+    --line: 1.875rem;
+    --margin: 4.25rem;
+    background-color: var(--color-sheet);
+    background-image:
+      linear-gradient(
+        to right,
+        transparent calc(var(--margin) - 1px),
+        var(--color-margin) calc(var(--margin) - 1px),
+        var(--color-margin) var(--margin),
+        transparent var(--margin)
+      ),
+      repeating-linear-gradient(
+        to bottom,
+        transparent 0,
+        transparent calc(var(--line) - 1px),
+        var(--color-rule) calc(var(--line) - 1px),
+        var(--color-rule) var(--line)
+      );
+    /* Lift the rules so text sits on them, the way handwriting does. */
+    background-position:
+      0 0,
+      0 -0.42rem;
+    background-attachment: local, local;
+  }
+
+  /* Text that sits on the ruled lines. */
+  .on-lines {
+    line-height: var(--line);
+  }
+
+  /* Content column to the right of the margin rule. */
+  .past-margin {
+    padding-left: calc(var(--margin) + 1rem);
+  }
+
+  /* Notes written in the margin, right-aligned against the red rule. */
+  .margin-note {
+    position: absolute;
+    left: 0;
+    width: calc(var(--margin) - 0.6rem);
+    text-align: right;
+    font-size: 0.72rem;
+    font-weight: 560;
+    font-variant-numeric: tabular-nums;
+    color: var(--color-pencil);
+    line-height: var(--line);
+  }
+
+  /* The reading face for lecture text. */
+  .reading {
+    font-family: var(--font-read);
+    font-size: 0.98rem;
+    font-weight: 400;
+    color: var(--color-ink);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }
