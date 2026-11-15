@@ -4,11 +4,12 @@ A study companion for students with patchy, expensive internet. Open a lecture P
 
 Built for the [#BuildHybridAI 2026 hackathon](https://firebasehybridaihackathon.devpost.com/) with [Firebase AI Logic](https://firebase.google.com/docs/ai-logic/hybrid-on-device-inference) hybrid inference (Gemini Nano in Chrome + Gemini in the cloud).
 
-> **Status:** in active development. Working now: open a lecture PDF, read it page by page with the extracted text beside each page, and reopen it later offline. Summaries and quizzes are next. See [BUILD_LOG.md](BUILD_LOG.md) for progress.
+> **Status:** in active development. Working now: open a lecture PDF, read it page by page with clean extracted text, and summarise any page on the device or in the cloud. Quizzes are next. See [BUILD_LOG.md](BUILD_LOG.md) for progress.
 
 ## Features
 
-- **PDF reader.** Open or drop a PDF. Each page is shown next to the exact text the AI will read. Pages that are scanned images are flagged.
+- **PDF reader.** Open or drop a PDF. Each page is shown next to the exact text the AI will read. Running headers, footers and page numbers are stripped, and paragraphs, headings, lists and contents entries are rebuilt. Pages that are scanned images are flagged.
+- **Summarise a page.** Streams 3 to 5 bullets. The router picks on-device (Gemini Nano, no data) or cloud, and says which before you press the button. Each summary records where it ran, how long it took and roughly how much data it used, and is saved on the device for free, offline re-reading.
 - **Kept on your device.** Documents are stored in the browser (IndexedDB), reopen offline, and remember the page you were on. Nothing is uploaded when you open a file.
 - **Connection details.** A built-in check sends the same question to Gemini Nano in Chrome and to Gemini in the cloud, showing where each answer ran and how long it took.
 
@@ -83,6 +84,10 @@ Built for the [#BuildHybridAI 2026 hackathon](https://firebasehybridaihackathon.
 src/
   ai/client.ts            Firebase AI Logic models, on-device availability, streaming
   ai/router.ts            Per-request on-device vs cloud decision
+  ai/prompts.ts           Prompts sized for Gemini Nano's on-device limits
+  ai/summaries.ts         Page summary jobs, streaming state and saving
+  components/SummarySection.tsx  Summary on the study sheet with margin marks
+  lib/pageText.ts         Header/footer removal and paragraph, heading and list rebuilding
   firebase.ts             Firebase app + App Check
   lib/pdf.ts              pdf.js loading, per-page text extraction, page rendering
   lib/importPdf.ts        Opening a PDF file into the on-device library

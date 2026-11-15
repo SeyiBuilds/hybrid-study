@@ -15,6 +15,20 @@ What was built each day, what broke, and what we changed and why. Newest day fir
   - Pages with no text (scans, pictures of slides) are detected and explained.
   - On phones, the page and its text sit on two tabs.
 - **Design system.** An exercise-book look: ruled sheet, red margin line, blue-black "biro" ink, highlighter-yellow text selection, and a night theme. Fonts are self-hosted: Archivo (condensed headings) and Literata (reading text). The connection test moved to a "Connection details" screen, opened from the status indicator.
+- **Readable page text.**
+  - Extraction rebuilds lines from where text sits on the page.
+  - Running headers, footers and page numbers are removed.
+  - Wrapped lines are rejoined into paragraphs, and words hyphenated across lines are put back together.
+  - Headings, list items and contents entries ("Title … 9") are recognised.
+  - The page index shows each page's heading.
+  - Documents saved earlier are re-extracted automatically the next time they open.
+- **Summarise.**
+  - "Summarise this page" goes through the router.
+  - Before you press it, the panel says where it will run and roughly how much data it will use.
+  - The answer streams in as 3 to 5 bullets.
+  - The margin records where it ran, how long it took and the data used.
+  - Summaries are saved per page on the device, so they reopen instantly, offline and for free.
+  - A summary that's still being written keeps going if you turn the page.
 
 ### What broke
 - The first cloud call failed with `Firebase AI Logic genai config not found` (HTTP 400): AI Logic wasn't enabled in the Firebase console yet. The app's error message wrongly blamed the internet connection.
@@ -24,6 +38,12 @@ What was built each day, what broke, and what we changed and why. Newest day fir
 - pdf.js 6 no longer has `PDFDocumentProxy.destroy()`, so the type check failed.
 - At 1024 px wide, the reader left the PDF page only about 200 px wide.
 - The first draft of the library rewrote the whole PDF in IndexedDB on every page turn.
+- On a real 40-page study guide, the text panel was hard to read:
+  - the running header and page numbers were read as content, so every page index entry looked the same
+  - contents dot leaders and page numbers ran into the next entry ("2Contents")
+  - every PDF line became its own line
+- Adding the summaries store needed a database upgrade, and it was blocked by a tab still holding the old version open, so the library showed nothing.
+- In the built-in test browser (no Gemini Nano, unregistered App Check token), cloud calls still return `Firebase AI Logic genai config not found`. Not yet explained, because the same call worked in Chrome.
 
 ### What we changed and why
 - **Error messages:** errors now recognise "genai config not found" and point to the AI Logic setup step. The "check your connection" message only shows when the browser is actually offline.
@@ -36,8 +56,18 @@ What was built each day, what broke, and what we changed and why. Newest day fir
 - **Library storage:** split into a small metadata store and a separate file store, so turning a page only updates a few bytes.
 - **Document titles:** the title comes from the file name. PDF metadata titles are often junk like "Microsoft Word - lec4.docx".
 - **Planning:** replaced the day-by-day schedule with a build order. Work moves to the next step as soon as one is pushed.
+- **Text extraction:**
+  - Text pieces are grouped into lines by position.
+  - A header or footer is a line repeated at the top or bottom of at least 40% of pages, and those lines are dropped.
+  - Lines are joined into paragraphs unless there's a vertical gap or the previous line ended short.
+  - Headings are lines set at least 18% larger than the body text.
+  - The text panel draws headings in Archivo and uses fainter ruled lines, so the words read first.
+- **Database upgrades:** open database connections now close themselves when a newer version asks to upgrade.
+- **On-device order:** on-device requests run one at a time. The SDK closes the previous on-device session when it starts a new one, so overlapping requests would cut each other off.
+- **Data estimates:** cloud data use is estimated from the prompt and response size plus HTTP overhead. It's a rough figure, to be refined with the badges and data-saved counter.
 
 ### Still open
 - The main JS bundle is 760 kB (pdf.js + Firebase). Split the reader into its own chunk in the design pass.
 - The hosted site needs a real App Check provider (reCAPTCHA Enterprise) at the deploy step, because visitors have no debug token.
-- Text extraction still needs testing on real lecture PDFs (multi-column layouts, slide decks).
+- Test extraction on more real lecture PDFs: multi-column layouts and slide decks.
+- Confirm Summarise in Chrome, both on-device and in the cloud, and work out why the test browser gets "genai config not found".
