@@ -22,12 +22,28 @@ export interface DocumentContent {
   id: string
   data: ArrayBuffer
   pages: PageText[]
+  /** Extraction version the pages were produced with (see EXTRACT_VERSION). */
+  version: number
+}
+
+export interface PageSummary {
+  /** `${documentId}:${pageNumber}` */
+  key: string
+  documentId: string
+  page: number
+  text: string
+  source: 'on_device' | 'in_cloud'
+  totalMs: number
+  /** Estimated mobile data used, in bytes (0 on-device). */
+  bytes: number
+  createdAt: number
 }
 
 const DB_NAME = 'hybrid-study'
-const DB_VERSION = 1
+const DB_VERSION = 2
 const META = 'documents'
 const CONTENT = 'documentContent'
+const SUMMARIES = 'summaries'
 
 let dbPromise: Promise<IDBDatabase> | null = null
 
@@ -38,9 +54,23 @@ function openDb(): Promise<IDBDatabase> {
       const db = request.result
       if (!db.objectStoreNames.contains(META)) db.createObjectStore(META, { keyPath: 'id' })
       if (!db.objectStoreNames.contains(CONTENT)) db.createObjectStore(CONTENT, { keyPath: 'id' })
+      if (!db.objectStoreNames.contains(SUMMARIES)) {
+        db.createObjectStore(SUMMARIES, { keyPath: 'key' }).createIndex('documentId', 'documentId')
+      }
     }
-    request.onsuccess = () => resolve(request.result)
-    request.onerror = () => reject(request.error)
+    request.onsuccess = () => {
+      const db = request.result
+      // Let a newer version of the app (in another tab, or after an update) upgrade the database.
+      db.onversionchange = () => {
+        db.close()
+        dbPromise = null
+      }
+      resolve(db)
+    }
+    request.onerror = () => {
+      dbPromise = null
+      reject(request.error)
+    }
   })
   return dbPromise
 }
@@ -74,7 +104,7 @@ export async function saveDocument(summary: DocumentSummary, content: DocumentCo
   await done(tx)
 }
 
-export async function getSummary(id: string): Promise<DocumentSummary | undefined> {
+export async function getDocumentSummary(id: string): Promise<DocumentSummary | undefined> {
   const db = await openDb()
   return promisify(db.transaction(META).objectStore(META).get(id) as IDBRequest<DocumentSummary | undefined>)
 }
@@ -93,18 +123,41 @@ export async function listDocuments(): Promise<DocumentSummary[]> {
 
 export async function deleteDocument(id: string): Promise<void> {
   const db = await openDb()
-  const tx = db.transaction([META, CONTENT], 'readwrite')
+  const tx = db.transaction([META, CONTENT, SUMMARIES], 'readwrite')
   tx.objectStore(META).delete(id)
   tx.objectStore(CONTENT).delete(id)
+  const summaries = tx.objectStore(SUMMARIES)
+  const keys = await promisify(summaries.index('documentId').getAllKeys(id))
+  keys.forEach((key) => summaries.delete(key))
   await done(tx)
 }
 
 /** Records the page the reader is on and when the document was last opened. */
 export async function touchDocument(id: string, lastPage: number): Promise<void> {
-  const summary = await getSummary(id)
+  const summary = await getDocumentSummary(id)
   if (!summary) return
   const db = await openDb()
   const tx = db.transaction(META, 'readwrite')
   tx.objectStore(META).put({ ...summary, lastPage, openedAt: Date.now() })
   await done(tx)
+}
+
+function summaryKey(documentId: string, page: number): string {
+  return `${documentId}:${page}`
+}
+
+export async function getPageSummary(documentId: string, page: number): Promise<PageSummary | undefined> {
+  const db = await openDb()
+  return promisify(
+    db.transaction(SUMMARIES).objectStore(SUMMARIES).get(summaryKey(documentId, page)) as IDBRequest<PageSummary | undefined>,
+  )
+}
+
+export async function savePageSummary(summary: Omit<PageSummary, 'key'>): Promise<PageSummary> {
+  const stored = { ...summary, key: summaryKey(summary.documentId, summary.page) }
+  const db = await openDb()
+  const tx = db.transaction(SUMMARIES, 'readwrite')
+  tx.objectStore(SUMMARIES).put(stored)
+  await done(tx)
+  return stored
 }

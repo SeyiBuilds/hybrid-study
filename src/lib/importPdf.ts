@@ -1,5 +1,6 @@
-import { documentId, getSummary, saveDocument, touchDocument } from './library'
+import { documentId, getDocumentSummary, saveDocument, touchDocument } from './library'
 import { closePdf, extractPages, hasUsableText, openPdf } from './pdf'
+import { EXTRACT_VERSION } from './pageText'
 
 export type ImportProgress =
   | { stage: 'reading' }
@@ -35,7 +36,7 @@ export async function importPdf(file: File, onProgress: (progress: ImportProgres
   const data = await file.arrayBuffer()
   const id = await documentId(data)
 
-  const existing = await getSummary(id)
+  const existing = await getDocumentSummary(id)
   if (existing) {
     await touchDocument(id, existing.lastPage)
     return id
@@ -67,7 +68,7 @@ export async function importPdf(file: File, onProgress: (progress: ImportProgres
         openedAt: now,
         lastPage: 1,
       },
-      { id, data, pages },
+      { id, data, pages, version: EXTRACT_VERSION },
     )
     return id
   } finally {

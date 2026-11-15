@@ -17,6 +17,7 @@
   --color-ink: #182848;
   --color-pencil: #5d6778;
   --color-rule: #c8d4e4;
+  --color-ruling: #d9e2ee;
   --color-margin: #d24537;
   --color-local: #2c7552;
   --color-cloud: #2a6fae;
@@ -30,6 +31,7 @@
     --color-ink: #e3e7ef;
     --color-pencil: #95a1b4;
     --color-rule: #263146;
+    --color-ruling: #1c2534;
     --color-margin: #e0675c;
     --color-local: #63c093;
     --color-cloud: #6daee6;
@@ -109,8 +111,8 @@ body {
         to bottom,
         transparent 0,
         transparent calc(var(--line) - 1px),
-        var(--color-rule) calc(var(--line) - 1px),
-        var(--color-rule) var(--line)
+        var(--color-ruling) calc(var(--line) - 1px),
+        var(--color-ruling) var(--line)
       );
     /* Lift the rules so text sits on them, the way handwriting does. */
     background-position:
@@ -145,9 +147,11 @@ body {
   /* The reading face for lecture text. */
   .reading {
     font-family: var(--font-read);
-    font-size: 0.98rem;
+    font-size: 1rem;
     font-weight: 400;
     color: var(--color-ink);
+    hyphens: auto;
+    overflow-wrap: break-word;
   }
 }
 

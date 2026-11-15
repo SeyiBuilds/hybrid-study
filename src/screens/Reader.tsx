@@ -1,11 +1,29 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
-import { getContent, getSummary, touchDocument, type DocumentContent, type DocumentSummary } from '../lib/library'
-import { closePdf, hasUsableText, openPdf, renderPage, type PageText, type PDFDocumentProxy } from '../lib/pdf'
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
+import {
+  getContent,
+  getDocumentSummary,
+  saveDocument,
+  touchDocument,
+  type DocumentContent,
+  type DocumentSummary,
+} from '../lib/library'
+import {
+  closePdf,
+  extractPages,
+  hasUsableText,
+  openPdf,
+  pageLabel,
+  renderPage,
+  type PageText,
+  type PDFDocumentProxy,
+} from '../lib/pdf'
+import { EXTRACT_VERSION, type TextBlock } from '../lib/pageText'
 import { plural } from '../lib/format'
 import { navigate, routes } from '../lib/useHashRoute'
 
 type LoadState =
   | { kind: 'loading' }
+  | { kind: 'updating'; done: number; total: number }
   | { kind: 'missing' }
   | { kind: 'failed'; message: string }
   | { kind: 'ready'; summary: DocumentSummary; content: DocumentContent; pdf: PDFDocumentProxy }
@@ -17,16 +35,25 @@ function useDocument(id: string): LoadState {
     let cancelled = false
     let pdf: PDFDocumentProxy | null = null
     ;(async () => {
-      const [summary, content] = await Promise.all([getSummary(id), getContent(id)])
+      let [summary, content] = await Promise.all([getDocumentSummary(id), getContent(id)])
       if (cancelled) return
       if (!summary || !content) {
         setState({ kind: 'missing' })
         return
       }
       pdf = await openPdf(content.data)
-      if (cancelled) {
-        void closePdf(pdf)
-        return
+      if (cancelled) return
+
+      // Documents saved by an older version of the extractor get their text rebuilt once.
+      if ((content.version ?? 1) < EXTRACT_VERSION) {
+        const pages = await extractPages(pdf, (done, total) => {
+          if (!cancelled) setState({ kind: 'updating', done, total })
+        })
+        if (cancelled) return
+        content = { ...content, pages, version: EXTRACT_VERSION }
+        summary = { ...summary, textPages: pages.filter(hasUsableText).length }
+        await saveDocument(summary, content)
+        if (cancelled) return
       }
       setState({ kind: 'ready', summary, content, pdf })
     })().catch((error: Error) => {
@@ -39,11 +66,6 @@ function useDocument(id: string): LoadState {
   }, [id])
 
   return state
-}
-
-function snippet(page: PageText): string {
-  if (!hasUsableText(page)) return 'No text on this page'
-  return page.text.replace(/\s+/g, ' ').slice(0, 60)
 }
 
 /** Renders the current PDF page at the width of its column. */
@@ -100,9 +122,45 @@ function PageCanvas({ pdf, pageNumber }: { pdf: PDFDocumentProxy; pageNumber: nu
   )
 }
 
+const LIST_SPLIT = /^(\S{1,5})\s+([\s\S]*)$/
+
+function Block({ block, first }: { block: TextBlock; first: boolean }) {
+  const style = !first && block.gapBefore ? { marginTop: 'var(--line)' } : undefined
+
+  if (block.kind === 'heading') {
+    return (
+      <h3 className="on-lines font-sans text-[1.06rem] font-[660] tracking-[-0.005em]" style={style}>
+        {block.text}
+      </h3>
+    )
+  }
+  if (block.kind === 'entry') {
+    return (
+      <p className="on-lines flex items-baseline gap-2" style={style}>
+        <span className="min-w-0">{block.text}</span>
+        <span className="min-w-4 flex-1 -translate-y-[0.3em] border-b border-dotted border-pencil/60" aria-hidden />
+        <span className="figures font-sans text-[0.85rem] text-pencil">{block.value}</span>
+      </p>
+    )
+  }
+  if (block.kind === 'list') {
+    const match = block.text.match(LIST_SPLIT)
+    return (
+      <p className="on-lines flex gap-2" style={style}>
+        <span className="figures w-6 shrink-0 font-sans text-[0.85rem] text-pencil">{match?.[1] ?? '•'}</span>
+        <span className="min-w-0">{match?.[2] ?? block.text}</span>
+      </p>
+    )
+  }
+  return (
+    <p className="on-lines" style={style}>
+      {block.text}
+    </p>
+  )
+}
+
 function PageTextSheet({ page }: { page: PageText }) {
   const usable = hasUsableText(page)
-  const paragraphs = useMemo(() => page.text.split(/\n{2,}/).filter(Boolean), [page.text])
 
   return (
     <article className="ruled relative min-h-full pb-[calc(var(--line)*3)]" aria-label={`Text of page ${page.number}`}>
@@ -113,17 +171,13 @@ function PageTextSheet({ page }: { page: PageText }) {
       <div className="relative">
         <span className="margin-note figures">{usable ? `${page.words} w` : ''}</span>
         <p className="past-margin on-lines pr-5 text-[0.82rem] text-pencil">
-          {usable ? `${plural(page.words, 'word')} on this page` : 'This page has no selectable text'}
+          {usable ? `${plural(page.words, 'word')}, cleaned up from the PDF` : 'This page has no selectable text'}
         </p>
       </div>
 
-      <div className="past-margin reading pr-5 sm:pr-7" style={{ paddingTop: 'var(--line)' }}>
+      <div className="past-margin reading pr-5 sm:pr-8" style={{ paddingTop: 'var(--line)' }}>
         {usable ? (
-          paragraphs.map((paragraph, index) => (
-            <p key={index} className="on-lines whitespace-pre-line" style={{ marginBottom: 'var(--line)' }}>
-              {paragraph}
-            </p>
-          ))
+          page.blocks.map((block, index) => <Block key={index} block={block} first={index === 0} />)
         ) : (
           <p className="on-lines text-pencil">
             It is probably a scanned image or a picture of a slide. You can read it on the left, but summaries and quizzes
@@ -165,7 +219,7 @@ function PageIndex({ pages, current, onSelect }: { pages: PageText[]; current: n
                     hasUsableText(page) ? (active ? 'text-ink' : 'text-pencil') : 'italic text-pencil/70'
                   }`}
                 >
-                  {snippet(page)}
+                  {pageLabel(page)}
                 </span>
               </button>
             </li>
@@ -320,6 +374,14 @@ export function Reader({ id, page, onTitle }: { id: string; page: number | null;
 
   if (state.kind === 'loading') {
     return <p className="px-6 py-16 text-center text-pencil">Opening…</p>
+  }
+
+  if (state.kind === 'updating') {
+    return (
+      <p className="figures px-6 py-16 text-center text-pencil" aria-live="polite">
+        Tidying up the text of this document: page {state.done} of {state.total}
+      </p>
+    )
   }
 
   if (state.kind === 'missing' || state.kind === 'failed') {

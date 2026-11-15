@@ -5,24 +5,12 @@
 import { getDocument, GlobalWorkerOptions, type PDFDocumentProxy } from 'pdfjs-dist'
 import type { TextItem } from 'pdfjs-dist/types/src/display/api'
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
+import { removeRunningLines, toPageText, type PageText, type RawLine } from './pageText'
 
 GlobalWorkerOptions.workerSrc = workerUrl
 
 export type { PDFDocumentProxy }
-
-export interface PageText {
-  /** 1-based page number, as printed in the PDF viewer. */
-  number: number
-  text: string
-  words: number
-}
-
-/** Below this many characters a page is treated as having no selectable text (likely a scan). */
-const MIN_TEXT_CHARS = 20
-
-export function hasUsableText(page: PageText): boolean {
-  return page.text.length >= MIN_TEXT_CHARS
-}
+export { hasUsableText, pageLabel, type PageText } from './pageText'
 
 /** Opens a PDF from bytes. The bytes are copied because pdf.js transfers them to its worker. */
 export async function openPdf(bytes: ArrayBuffer): Promise<PDFDocumentProxy> {
@@ -34,43 +22,51 @@ export function closePdf(doc: PDFDocumentProxy): Promise<void> {
   return doc.loadingTask.destroy()
 }
 
-function normalise(raw: string): string {
-  return raw
-    .replace(/[ \t ]+/g, ' ')
-    .split('\n')
-    .map((line) => line.trim())
-    .join('\n')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim()
+/**
+ * Groups a page's text items into visual lines by their position, so text that pdf.js
+ * returns in pieces (contents entries, dot leaders, page numbers) stays on one line.
+ */
+async function readLines(doc: PDFDocumentProxy, pageNumber: number): Promise<RawLine[]> {
+  const page = await doc.getPage(pageNumber)
+  const content = await page.getTextContent()
+  const lines: RawLine[] = []
+  let current: RawLine | null = null
+
+  for (const item of content.items) {
+    if (!('str' in item)) continue
+    const { str, transform, width, height } = item as TextItem
+    if (!str) continue
+    const x = transform[4] as number
+    const y = transform[5] as number
+    const size = Math.hypot(transform[2] as number, transform[3] as number) || height || 10
+
+    if (current && Math.abs(y - current.y) <= Math.max(current.size, size) * 0.45) {
+      const gap = x - current.endX
+      if (gap > size * 0.18 && !current.text.endsWith(' ') && !str.startsWith(' ')) current.text += ' '
+      current.text += str
+      current.endX = Math.max(current.endX, x + width)
+      current.size = Math.max(current.size, size)
+    } else {
+      if (current) lines.push(current)
+      current = { text: str, x, endX: x + width, y, size }
+    }
+  }
+  if (current) lines.push(current)
+  page.cleanup()
+  return lines.filter((line) => line.text.trim())
 }
 
-function countWords(text: string): number {
-  const matches = text.match(/\S+/g)
-  return matches ? matches.length : 0
-}
-
-/** Extracts the text of every page, reporting progress as pages complete. */
+/** Extracts clean text for every page, reporting progress as pages are read. */
 export async function extractPages(
   doc: PDFDocumentProxy,
   onProgress?: (done: number, total: number) => void,
 ): Promise<PageText[]> {
-  const pages: PageText[] = []
+  const raw: RawLine[][] = []
   for (let number = 1; number <= doc.numPages; number++) {
-    const page = await doc.getPage(number)
-    const content = await page.getTextContent()
-    let raw = ''
-    for (const item of content.items) {
-      if (!('str' in item)) continue
-      const textItem = item as TextItem
-      raw += textItem.str
-      if (textItem.hasEOL) raw += '\n'
-    }
-    page.cleanup()
-    const text = normalise(raw)
-    pages.push({ number, text, words: countWords(text) })
+    raw.push(await readLines(doc, number))
     onProgress?.(number, doc.numPages)
   }
-  return pages
+  return removeRunningLines(raw).map((lines, index) => toPageText(index + 1, lines))
 }
 
 /**
