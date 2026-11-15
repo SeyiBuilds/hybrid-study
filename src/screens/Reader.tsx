@@ -1,4 +1,6 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
+import type { OnDeviceStatus } from '../ai/client'
+import { SummarySection } from '../components/SummarySection'
 import {
   getContent,
   getDocumentSummary,
@@ -18,7 +20,6 @@ import {
   type PDFDocumentProxy,
 } from '../lib/pdf'
 import { EXTRACT_VERSION, type TextBlock } from '../lib/pageText'
-import { plural } from '../lib/format'
 import { navigate, routes } from '../lib/useHashRoute'
 
 type LoadState =
@@ -159,29 +160,25 @@ function Block({ block, first }: { block: TextBlock; first: boolean }) {
   )
 }
 
-function PageTextSheet({ page }: { page: PageText }) {
+function PageTextSheet({ page, top }: { page: PageText; top: ReactNode }) {
   const usable = hasUsableText(page)
 
   return (
-    <article className="ruled relative min-h-full pb-[calc(var(--line)*3)]" aria-label={`Text of page ${page.number}`}>
-      <div className="relative" style={{ paddingTop: 'var(--line)' }}>
-        <span className="margin-note figures">p.&nbsp;{page.number}</span>
+    <article className="ruled relative min-h-full pb-[calc(var(--line)*3)]" aria-label={`Study sheet for page ${page.number}`}>
+      <div style={{ paddingTop: 'var(--line)' }}>{top}</div>
+
+      <div className="relative" style={{ marginTop: 'var(--line)' }}>
+        <span className="margin-note figures">{usable ? `${page.words} w` : ''}</span>
         <p className="past-margin on-lines eyebrow pr-5">What the AI reads</p>
       </div>
-      <div className="relative">
-        <span className="margin-note figures">{usable ? `${page.words} w` : ''}</span>
-        <p className="past-margin on-lines pr-5 text-[0.82rem] text-pencil">
-          {usable ? `${plural(page.words, 'word')}, cleaned up from the PDF` : 'This page has no selectable text'}
-        </p>
-      </div>
 
-      <div className="past-margin reading pr-5 sm:pr-8" style={{ paddingTop: 'var(--line)' }}>
+      <div className="past-margin reading pr-5 sm:pr-8">
         {usable ? (
           page.blocks.map((block, index) => <Block key={index} block={block} first={index === 0} />)
         ) : (
           <p className="on-lines text-pencil">
-            It is probably a scanned image or a picture of a slide. You can read it on the left, but summaries and quizzes
-            need text, so they will skip this page.
+            This page has no selectable text. It is probably a scanned image or a picture of a slide. You can read it on
+            the left, but summaries and quizzes need text, so they skip this page.
           </p>
         )}
       </div>
@@ -279,16 +276,23 @@ function PageControls({ current, total, onGo }: { current: number; total: number
   )
 }
 
+interface Connectivity {
+  online: boolean
+  deviceStatus: OnDeviceStatus | null
+}
+
 function ReaderView({
   summary,
   content,
   pdf,
   requestedPage,
+  connectivity,
 }: {
   summary: DocumentSummary
   content: DocumentContent
   pdf: PDFDocumentProxy
   requestedPage: number | null
+  connectivity: Connectivity
 }) {
   const total = content.pages.length
   const current = Math.min(Math.max(1, requestedPage ?? summary.lastPage ?? 1), total)
@@ -339,7 +343,7 @@ function ReaderView({
 
       <div className="flex gap-1 rounded-full bg-desk p-1 lg:hidden mx-4 mt-4 border border-rule">
         {tab('page', 'Page')}
-        {tab('text', 'Text')}
+        {tab('text', 'Study')}
       </div>
 
       <section
@@ -354,9 +358,20 @@ function ReaderView({
         className={`overflow-y-auto border-rule px-4 pb-6 lg:block lg:border-l lg:px-0 lg:pb-0 ${
           mobileView === 'text' ? 'block pt-4' : 'hidden'
         }`}
-        aria-label="Page text"
+        aria-label="Study sheet"
       >
-        <PageTextSheet page={page} />
+        <PageTextSheet
+          page={page}
+          top={
+            <SummarySection
+              documentId={summary.id}
+              title={summary.title}
+              page={page}
+              online={connectivity.online}
+              deviceStatus={connectivity.deviceStatus}
+            />
+          }
+        />
         <div className="py-4 lg:hidden">
           <PageControls current={current} total={total} onGo={go} />
         </div>
@@ -365,7 +380,17 @@ function ReaderView({
   )
 }
 
-export function Reader({ id, page, onTitle }: { id: string; page: number | null; onTitle: (title: string | null) => void }) {
+export function Reader({
+  id,
+  page,
+  onTitle,
+  connectivity,
+}: {
+  id: string
+  page: number | null
+  onTitle: (title: string | null) => void
+  connectivity: Connectivity
+}) {
   const state = useDocument(id)
 
   useEffect(() => {
@@ -405,5 +430,13 @@ export function Reader({ id, page, onTitle }: { id: string; page: number | null;
     )
   }
 
-  return <ReaderView summary={state.summary} content={state.content} pdf={state.pdf} requestedPage={page} />
+  return (
+    <ReaderView
+      summary={state.summary}
+      content={state.content}
+      pdf={state.pdf}
+      requestedPage={page}
+      connectivity={connectivity}
+    />
+  )
 }

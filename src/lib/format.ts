@@ -16,6 +16,18 @@ export function fileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
+/** Mobile data in the units students see on their data balance. */
+export function dataSize(bytes: number, { approximate = true } = {}): string {
+  if (bytes === 0) return '0 KB'
+  const prefix = approximate ? '~' : ''
+  if (bytes < 1024 * 1024) return `${prefix}${Math.max(1, Math.round(bytes / 1024))} KB`
+  return `${prefix}${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+export function seconds(ms: number): string {
+  return ms < 10_000 ? `${(ms / 1000).toFixed(1)} s` : `${Math.round(ms / 1000)} s`
+}
+
 export function plural(count: number, word: string, pluralWord = `${word}s`): string {
   return `${count} ${count === 1 ? word : pluralWord}`
 }

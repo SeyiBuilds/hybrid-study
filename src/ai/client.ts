@@ -111,13 +111,42 @@ export interface GenerateResult {
   totalMs: number
   /** Time until the first chunk of text arrived, in milliseconds. */
   firstChunkMs: number | null
+  /** Estimated mobile data used, in bytes. Always 0 on-device. */
+  bytes: number
+}
+
+const utf8 = new TextEncoder()
+
+/**
+ * Rough size of a cloud request on the wire: the prompt in a JSON body, the streamed
+ * response (each server-sent event repeats JSON wrapping around its text) and
+ * HTTP/TLS overhead. Good enough to show students the order of magnitude.
+ */
+export function estimateCloudBytes(prompt: string, response: string): number {
+  const requestBody = utf8.encode(prompt).length + 400
+  const responseBody = utf8.encode(response).length * 1.6 + 900
+  const overhead = 1800
+  return Math.round(requestBody + responseBody + overhead)
+}
+
+/** Rough data cost of sending a prompt to the cloud, before the answer is known. */
+export function estimateCloudBytesFor(prompt: string, expectedAnswerChars = 700): number {
+  return estimateCloudBytes(prompt, 'x'.repeat(expectedAnswerChars))
 }
 
 /**
- * Streams a single-turn text answer from the chosen target.
- * `onText` receives the full text so far each time a chunk arrives.
+ * Chrome's on-device model works best with one prompt at a time, and the SDK closes the
+ * previous on-device session when a new one starts, so on-device requests run in order.
  */
-export async function generateStream(
+let onDeviceQueue: Promise<unknown> = Promise.resolve()
+
+function runOnDeviceInOrder<T>(job: () => Promise<T>): Promise<T> {
+  const next = onDeviceQueue.then(job, job)
+  onDeviceQueue = next.catch(() => undefined)
+  return next
+}
+
+async function stream(
   prompt: string,
   target: Target,
   onText: (textSoFar: string) => void,
@@ -142,24 +171,39 @@ export async function generateStream(
   }
 
   const response = await result.response
+  const source =
+    response.inferenceSource ?? (target === 'on_device' ? InferenceSource.ON_DEVICE : InferenceSource.IN_CLOUD)
   return {
     text,
-    source:
-      response.inferenceSource ??
-      (target === 'on_device' ? InferenceSource.ON_DEVICE : InferenceSource.IN_CLOUD),
+    source,
     totalMs: performance.now() - started,
     firstChunkMs,
+    bytes: source === InferenceSource.IN_CLOUD ? estimateCloudBytes(prompt, text) : 0,
   }
+}
+
+/**
+ * Streams a single-turn text answer from the chosen target.
+ * `onText` receives the full text so far each time a chunk arrives.
+ */
+export function generateStream(
+  prompt: string,
+  target: Target,
+  onText: (textSoFar: string) => void,
+): Promise<GenerateResult> {
+  if (target === 'on_device') return runOnDeviceInOrder(() => stream(prompt, target, onText))
+  return stream(prompt, target, onText)
 }
 
 /** Turns SDK errors into a message a student (or Seyi during setup) can act on. */
 export function describeError(error: unknown): string {
   if (error instanceof OnDeviceNotReadyError) return error.message
+  if (error instanceof Error && error.name === 'NoRouteError') return error.message
 
   if (error instanceof AIError) {
     const message = error.message
     if (error.code === 'api-not-enabled' || /genai config not found/i.test(message)) {
-      return 'Firebase AI Logic is not set up for this project yet. In Firebase console, open AI Services > AI Logic, click Get started and choose the Gemini Developer API.'
+      return 'The cloud model is not set up for this Firebase project yet (or was set up in the last few minutes). In Firebase console, open AI Services > AI Logic, click Get started and choose the Gemini Developer API, then try again.'
     }
     if (/app.?check/i.test(message) || /\[(401|403)\b/.test(message)) {
       return 'The cloud request was rejected (App Check or permissions). In development, copy the App Check debug token from the browser console into Firebase console > App Check > Apps > Manage debug tokens, then reload.'

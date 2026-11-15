@@ -93,6 +93,7 @@ export function Diagnostics({
     let latest = ''
     try {
       const result = await ask(prompt, {
+        task: 'connection-test',
         force: target,
         onText: (soFar) => {
           latest = soFar
