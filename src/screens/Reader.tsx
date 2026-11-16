@@ -39,6 +39,14 @@ type LoadState =
   | { kind: 'failed'; message: string }
   | { kind: 'ready'; summary: DocumentSummary; content: DocumentContent; pdf: PDFDocumentProxy }
 
+/** Plain-language reason a document failed to open. */
+function openErrorMessage(error: Error): string {
+  if (/fake worker|dynamically imported module|failed to fetch|networkerror/i.test(error.message)) {
+    return "Part of the PDF reader didn't load because the connection to Hybrid Study dropped. Reload the page once you're connected. Your document, notes and highlights are safe on this laptop."
+  }
+  return `The PDF couldn't be read (${error.message}). Your notes and highlights are safe. Try opening the PDF again from the library.`
+}
+
 function useDocument(id: string): LoadState {
   const [state, setState] = useState<LoadState>({ kind: 'loading' })
 
@@ -68,7 +76,7 @@ function useDocument(id: string): LoadState {
       }
       setState({ kind: 'ready', summary, content, pdf })
     })().catch((error: Error) => {
-      if (!cancelled) setState({ kind: 'failed', message: error.message })
+      if (!cancelled) setState({ kind: 'failed', message: openErrorMessage(error) })
     })
     return () => {
       cancelled = true
@@ -536,12 +544,23 @@ export function Reader({
             ? 'It may have been removed, or it was opened in another browser. Open the PDF again from the library.'
             : state.message}
         </p>
-        <a
-          href={routes.library}
-          className="mt-8 inline-block font-[620] underline decoration-margin decoration-2 underline-offset-[5px]"
-        >
-          Back to the library
-        </a>
+        <div className="mt-8 flex items-center justify-center gap-6">
+          {state.kind === 'failed' && (
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="rounded-full bg-ink px-5 py-2 text-[0.9rem] font-[620] text-sheet hover:opacity-90"
+            >
+              Reload
+            </button>
+          )}
+          <a
+            href={routes.library}
+            className="inline-block font-[620] underline decoration-margin decoration-2 underline-offset-[5px]"
+          >
+            Back to the library
+          </a>
+        </div>
       </div>
     )
   }

@@ -2,7 +2,7 @@
  * PDF loading, per-page text extraction and page rendering with pdf.js.
  * The worker is bundled with the app (no CDN), so this works offline.
  */
-import { getDocument, GlobalWorkerOptions, TextLayer, type PDFDocumentProxy } from 'pdfjs-dist'
+import { getDocument, GlobalWorkerOptions, PDFWorker, TextLayer, type PDFDocumentProxy } from 'pdfjs-dist'
 import type { TextItem } from 'pdfjs-dist/types/src/display/api'
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 import { removeRunningLines, toPageText, type PageText, type RawLine } from './pageText'
@@ -12,12 +12,41 @@ GlobalWorkerOptions.workerSrc = workerUrl
 export type { PDFDocumentProxy }
 export { hasUsableText, pageLabel, type PageText } from './pageText'
 
-/** Opens a PDF from bytes. The bytes are copied because pdf.js transfers them to its worker. */
-export async function openPdf(bytes: ArrayBuffer): Promise<PDFDocumentProxy> {
-  return getDocument({ data: new Uint8Array(bytes.slice(0)) }).promise
+let sharedWorker: PDFWorker | null = null
+
+/**
+ * One pdf.js worker for the whole app, started when the app loads and reused by every
+ * document. By default pdf.js downloads a fresh worker each time a document opens, so a
+ * dropped connection (or a stopped server) after the app loaded meant no PDF could open.
+ */
+function pdfWorker(): PDFWorker {
+  if (!sharedWorker) {
+    const worker = new PDFWorker()
+    // If it failed to start (e.g. offline on first load), try again next time.
+    worker.promise.catch(() => {
+      if (sharedWorker === worker) sharedWorker = null
+    })
+    sharedWorker = worker
+  }
+  return sharedWorker
 }
 
-/** Releases the document and its worker resources. */
+/** Starts the PDF worker early, while the app's files are still reachable. */
+export function startPdfWorker(): Promise<void> {
+  return pdfWorker().promise
+}
+
+/** Opens a PDF from bytes. The bytes are copied because pdf.js transfers them to its worker. */
+export async function openPdf(bytes: ArrayBuffer): Promise<PDFDocumentProxy> {
+  return getDocument({
+    data: new Uint8Array(bytes.slice(0)),
+    worker: pdfWorker(),
+    // Pages are drawn on the main thread; no separate renderer worker to download.
+    disableWorkerRendering: true,
+  }).promise
+}
+
+/** Releases the document. The shared worker stays alive for the next one. */
 export function closePdf(doc: PDFDocumentProxy): Promise<void> {
   return doc.loadingTask.destroy()
 }
