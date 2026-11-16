@@ -29,6 +29,10 @@ What was built each day, what broke, and what we changed and why. Newest day fir
 - **The ask-a-question test seemed to have disappeared.** It had moved to "Connection details" behind the status indicator, where it was easy to miss.
 - **The dev server kept stopping.** Servers started from a coding session (a preview, a terminal tab, a background process) are stopped when that session or command ends. One server also hung after its output pipe closed.
 - **The built-in browser pane couldn't draw while hidden,** so it couldn't be used to check rendering and selection.
+- **A saved document wouldn't open:** "Setting up fake worker failed: Failed to fetch dynamically imported module … pdf.worker.min.mjs".
+  - The app had loaded, then its dev server stopped. A test script had cleared the dev server's port and stopped the server when it finished.
+  - pdf.js downloads a fresh worker every time a document opens, so with the server gone, no PDF could open.
+  - The same thing would happen to a student whose connection drops after the app loads.
 - **Unverified browsers get a misleading error.** Two test browsers whose App Check debug tokens weren't registered both got `Firebase AI Logic genai config not found` from the cloud, while the registered Chrome works. The app's message blamed only the AI Logic setup.
 
 ### What we changed and why
@@ -39,6 +43,11 @@ What was built each day, what broke, and what we changed and why. Newest day fir
 - **Page sizing** reacts to size changes directly instead of waiting an extra animation frame.
 - **Testing.** Highlighting, notes and asking were checked end to end by driving the installed Chrome headless with a throwaway profile: select, highlight, note, ask, then check the database.
 - **The "genai config not found" message** now names both likely causes: an unverified App Check token, or AI Logic not set up.
+- **One PDF worker for the whole app.**
+  - It's started as soon as the app loads and reused for every document, instead of downloaded each time one opens.
+  - A headless test confirmed it: load the app, stop the server, open a saved document. That failed before the change and works after it.
+  - If a document still can't open, the reader now explains it in plain words and offers a Reload button.
+- **Test scripts** run their own dev server on a separate port and never stop a process they didn't start.
 
 ### Still open
 - Seyi to try highlighting, notes and asking in Chrome, on-device and in the cloud.
