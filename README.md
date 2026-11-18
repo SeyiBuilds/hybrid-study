@@ -4,7 +4,7 @@ A study companion for students with patchy, expensive internet. Open a lecture P
 
 Built for the [#BuildHybridAI 2026 hackathon](https://firebasehybridaihackathon.devpost.com/) with [Firebase AI Logic](https://firebase.google.com/docs/ai-logic/hybrid-on-device-inference) hybrid inference (Gemini Nano in Chrome + Gemini in the cloud).
 
-> **Status:** in active development. Working now: open a lecture PDF, highlight and take notes on it, summarise any page and ask questions about it, on the device or in the cloud. Quizzes are next. See [BUILD_LOG.md](BUILD_LOG.md) for progress.
+> **Status:** in active development. Working now: open a lecture PDF, highlight and take notes on it, then summarise, question and quiz yourself on any page, on the device or in the cloud. The full routing rules are next. See [BUILD_LOG.md](BUILD_LOG.md) for progress.
 
 ## Features
 
@@ -12,6 +12,7 @@ Built for the [#BuildHybridAI 2026 hackathon](https://firebasehybridaihackathon.
 - **Highlight on the page.** Select words on the PDF itself and mark them with a yellow, green or pink highlighter. Click a highlight to recolour it, add a note, ask about it or remove it.
 - **A study sheet for every page.** A ruled sheet beside the page holds the summary, your questions, your own notes (written in "blue biro") and a list of your highlights with their notes. Summaries can be edited into your own words.
 - **Summarise a page.** 3 to 5 bullets, shown whole when ready. Each answer records where it ran, how long it took and roughly how much data it used, in the margin.
+- **Quiz me.** Five multiple-choice questions from the page. Choose your answers, then the sheet marks them like a script: ticks and crosses in the margin, a circled score and a short explanation for each question. Quizzes and scores are saved on the device.
 - **Ask about this page.** Type a question, or ask about highlighted words. Answers are kept on the sheet.
 - **Run AI on: Auto, This laptop or Cloud.** Auto lets the router decide per request (Gemini Nano on the device when it can, the cloud when it must). The sheet says where a request will run and what it will cost before you press the button.
 - **Kept on your device.** Documents, highlights, notes, summaries and answers are stored in the browser (IndexedDB), work offline and remember the page you were on. Nothing is uploaded when you open a file.
@@ -21,6 +22,7 @@ Built for the [#BuildHybridAI 2026 hackathon](https://firebasehybridaihackathon.
 
 - `src/ai/client.ts` creates two Firebase AI Logic models with the Gemini Developer API backend: one pinned to `InferenceMode.ONLY_ON_DEVICE` (Gemini Nano through Chrome's Prompt API) and one pinned to `InferenceMode.ONLY_IN_CLOUD`. Requests use `generateContentStream` (for time-to-first-token), answers are shown whole, and `response.inferenceSource` confirms where each one ran. On-device requests run one at a time.
 - `src/ai/router.ts` is the single entry point for generation. It decides per request which model to use (or follows the student's "Run AI on" choice) and returns a short reason string.
+- Quizzes use structured output: one `Schema` is passed as `responseConstraint` on-device and `responseSchema` in the cloud (`src/ai/quiz.ts`). Every reply is still parsed and validated, and an unusable reply is requested once more.
 - App Check protects the cloud calls (debug provider in development).
 
 ## Requirements
@@ -94,9 +96,12 @@ src/
   ai/jobs.ts              AI requests in progress (kept alive across page turns)
   ai/summaries.ts         Page summaries
   ai/asks.ts              Questions about a page
+  ai/quiz.ts              Quiz schema, parsing and validation
+  ai/quizzes.ts           Writing and saving page quizzes
   components/PdfPage.tsx  Rendered page, selectable text layer and highlights
   components/MarkToolbar.tsx     Highlighter colours, note and ask over a selection
   components/SummarySection.tsx  Summary on the study sheet, editable
+  components/QuizSection.tsx     Quiz questions, marking and score
   components/AskSection.tsx      Ask about this page
   components/NotesSection.tsx    My notes and the page's highlights
   components/sheet.tsx    Ruled-sheet rows, margin marks, waiting state, Run AI on switch

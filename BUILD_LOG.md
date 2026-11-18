@@ -6,17 +6,26 @@ What was built each day, what broke, and what we changed and why. Newest day fir
 
 ### Built
 - **Redesigned "Run AI on".** Auto, This laptop and Cloud now sit on a ruled line as plain words, and the chosen one is underlined in red. The margin shows where AI will actually run right now (`device`, `cloud` or `none`), and the line below says why.
+- **Quiz me.**
+  - Five multiple-choice questions from the current page, written on-device or in the cloud through the router.
+  - You circle answers in biro-blue. "Mark my answers" then adds red ticks and crosses in the margin, a circled score, the right answers and a short explanation for each question.
+  - Quizzes, answers and scores are saved per page on the device. They survive reloads, and you can retry the same questions or ask for new ones.
+  - Pages without enough real text, such as a contents page, don't offer a quiz.
 
 ### What broke
 - The labels in the old pill-shaped switch sat too low and were cut off. The buttons were 20 px tall but inherited the sheet's 30 px line height.
 
 ### What we changed and why
+- **One schema, both models.** Firebase's hybrid guide passes the same `Schema` to `responseConstraint` and `responseSchema`. Model configuration is fixed per instance, so quizzes have their own on-device and cloud models.
+- **Validate everything.** A schema doesn't guarantee a usable quiz. Each reply is parsed and checked for four distinct options and a real answer. Bad questions are dropped, at least three must survive, and an unusable reply is requested once more.
+- **The answer is a letter, and options are shuffled in code,** because small models tend to put the right answer first. Options like "All of the above" keep their order.
 - **Dropped the pill.** It looked pasted onto the ruled paper, so the options now follow the sheet's own lines.
 - **Real radio buttons underneath.** Arrow keys move the choice without turning the PDF page, and options that can't work right now (Cloud while offline, This laptop without on-device AI) are disabled.
 - **Tested in headless Chrome** across every state: each choice, keyboard, offline, no on-device AI, light and dark themes.
 
 ### Still open
-- Quiz step next.
+- Try the quiz with the real Gemini Nano and cloud model in Chrome. Automated tests used scripted model replies, so question quality and on-device speed are still unmeasured.
+- Router v1 is next.
 - Hosting comes at the deploy step. Until then the app needs the local dev server; after that, students just open a link.
 
 ## Mon 16 Nov 2026
