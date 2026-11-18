@@ -2,6 +2,23 @@
 
 What was built each day, what broke, and what we changed and why. Newest day first.
 
+## Wed 18 Nov 2026
+
+### Built
+- **Redesigned "Run AI on".** Auto, This laptop and Cloud now sit on a ruled line as plain words, and the chosen one is underlined in red. The margin shows where AI will actually run right now (`device`, `cloud` or `none`), and the line below says why.
+
+### What broke
+- The labels in the old pill-shaped switch sat too low and were cut off. The buttons were 20 px tall but inherited the sheet's 30 px line height.
+
+### What we changed and why
+- **Dropped the pill.** It looked pasted onto the ruled paper, so the options now follow the sheet's own lines.
+- **Real radio buttons underneath.** Arrow keys move the choice without turning the PDF page, and options that can't work right now (Cloud while offline, This laptop without on-device AI) are disabled.
+- **Tested in headless Chrome** across every state: each choice, keyboard, offline, no on-device AI, light and dark themes.
+
+### Still open
+- Quiz step next.
+- Hosting comes at the deploy step. Until then the app needs the local dev server; after that, students just open a link.
+
 ## Mon 16 Nov 2026
 
 ### Built
