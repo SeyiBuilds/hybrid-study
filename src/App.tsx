@@ -41,7 +41,7 @@ export default function App() {
 
       {route.name === 'library' && <Library />}
       {route.name === 'reader' && (
-        <Reader id={route.id} page={route.page} onTitle={setDocTitle} connectivity={{ online, deviceStatus }} />
+        <Reader id={route.id} page={route.page} onTitle={setDocTitle} connectivity={{ deviceStatus }} />
       )}
       {route.name === 'diagnostics' && <Diagnostics online={online} deviceStatus={deviceStatus} refresh={refresh} />}
     </>

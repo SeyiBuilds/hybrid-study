@@ -1,7 +1,9 @@
 /** Shared class names and helpers for the ruled study sheet. */
-import { estimateCloudBytesFor, type OnDeviceStatus } from '../ai/client'
-import { decide, type Task } from '../ai/router'
+import { estimateCloudBytesFor, type OnDeviceStatus, type Target } from '../ai/client'
+import type { Difficulty } from '../ai/difficulty'
+import { decide, type RouteCause, type Task } from '../ai/router'
 import { dataSize } from '../lib/format'
+import type { NetworkState } from '../lib/network'
 import { forcedTarget, type RunOn } from '../lib/runOn'
 
 export const pillButton =
@@ -19,34 +21,48 @@ export interface RunPreview {
   blocked: boolean
 }
 
-/** Tells the student, before they press the button, where a request will run and what it costs. */
+const ON_DEVICE_PREVIEW: Partial<Record<RouteCause, string>> = {
+  offline: "You're offline, so this runs on this laptop and uses no data.",
+  'data-saver': 'Data saver is on, so this runs on this laptop and uses no data.',
+  'weak-connection': 'The connection is too weak for the cloud, so this runs on this laptop and uses no data.',
+}
+
+/** Tells the student, before they press the button, where a request will run, why, and what it costs. */
 export function previewRun({
   task,
+  difficulty,
   runOn,
-  online,
+  network,
   deviceStatus,
   prompt,
   expectedAnswerChars,
 }: {
   task: Task
+  difficulty?: Difficulty
   runOn: RunOn
-  online: boolean
+  network: NetworkState
   deviceStatus: OnDeviceStatus | null
-  prompt: string
+  /** The prompt, or a function of the target when that changes what is sent. */
+  prompt: string | ((target: Target) => string)
   /** Rough answer length, for the data estimate. */
   expectedAnswerChars?: number
 }): RunPreview {
-  const decision = decide({ task, force: forcedTarget(runOn), onDeviceStatus: deviceStatus, online })
+  const decision = decide({ task, difficulty, force: forcedTarget(runOn), onDeviceStatus: deviceStatus, network })
   if (!decision) return { text: 'You are offline, and this browser cannot run AI on the device.', blocked: true }
   if (decision.target === 'on_device') {
     if (deviceStatus !== 'available') {
       return { text: "This laptop's AI is not ready. Choose Auto or Cloud above.", blocked: true }
     }
-    return { text: 'Runs on this laptop and uses no data.', blocked: false }
+    return { text: ON_DEVICE_PREVIEW[decision.cause] ?? 'Runs on this laptop and uses no data.', blocked: false }
   }
-  if (!online) return { text: 'You are offline. Choose Auto or This laptop above.', blocked: true }
+  if (network.quality === 'offline') return { text: 'You are offline. Choose Auto or This laptop above.', blocked: true }
+  const text = typeof prompt === 'function' ? prompt(decision.target) : prompt
+  const size = dataSize(estimateCloudBytesFor(text, expectedAnswerChars), { approximate: false })
   return {
-    text: `Runs in the cloud and uses about ${dataSize(estimateCloudBytesFor(prompt, expectedAnswerChars), { approximate: false })} of data.`,
+    text:
+      decision.cause === 'hard-task'
+        ? `Hard question, so this runs in the cloud and uses about ${size} of data.`
+        : `Runs in the cloud and uses about ${size} of data.`,
     blocked: false,
   }
 }

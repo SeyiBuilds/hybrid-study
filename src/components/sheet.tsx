@@ -1,9 +1,11 @@
 /** Building blocks for the ruled study sheet. */
 import { useEffect, useState, type ReactNode } from 'react'
 import type { OnDeviceStatus, Target } from '../ai/client'
-import { decide } from '../ai/router'
+import { useRouteLog } from '../ai/routeLog'
+import { decide, type Task } from '../ai/router'
 import { parseAiText } from '../ai/summaries'
 import { dataSize, seconds } from '../lib/format'
+import { networkLabel, useNetwork, type NetworkState } from '../lib/network'
 import { forcedTarget, setRunOn, useRunOn, type RunOn } from '../lib/runOn'
 
 /** A row of the sheet, with an optional note written in the margin. */
@@ -144,35 +146,87 @@ const RUN_ON_OPTIONS: Array<{ id: RunOn; label: string }> = [
   { id: 'in_cloud', label: 'Cloud' },
 ]
 
-const RUN_ON_HELP: Record<Target, string> = {
-  on_device: 'Free and works offline. Slower on laptops without a graphics card.',
+const CHOICE_HELP: Record<Target, string> = {
+  on_device: 'Data saver: free and works offline. Slower on laptops without a graphics card.',
   in_cloud: 'Usually faster, but uses data and needs a connection.',
 }
 
-const AUTO_HELP: Record<Target, string> = {
-  on_device: 'Using this laptop right now: free, and it works offline.',
-  in_cloud: "Using the cloud, because this laptop's AI is not ready.",
+const TASK_LABELS: Record<Task, string> = {
+  summarise: 'Summary',
+  ask: 'Question',
+  quiz: 'Quiz',
+  'connection-test': 'Connection test',
+}
+
+function autoHelp(network: NetworkState, deviceReady: boolean): string {
+  if (!deviceReady) return "Using the cloud, because this laptop's AI is not ready."
+  if (network.quality === 'offline') return "You're offline, so everything runs on this laptop."
+  if (network.saveData) return "Your browser's data saver is on, so everything stays on this laptop."
+  if (!network.usable) return 'The connection is very weak, so everything stays on this laptop.'
+  return 'Simple tasks stay on this laptop. Hard questions use the cloud.'
+}
+
+function DetailRow({ label, value }: { label: string; value: string }) {
+  return (
+    <p className="on-lines flex justify-between gap-4 font-sans text-[0.8rem]">
+      <span className="shrink-0 text-pencil">{label}</span>
+      <span className="figures truncate font-[560] text-ink">{value}</span>
+    </p>
+  )
+}
+
+/** The router's inputs and its recent decisions, for anyone curious (and for the demo). */
+function RouterDetails({ deviceStatus, runOn, network }: { deviceStatus: OnDeviceStatus | null; runOn: RunOn; network: NetworkState }) {
+  const log = useRouteLog()
+  const saver = runOn === 'on_device' ? 'On (This laptop)' : network.saveData ? 'On (browser)' : 'Off'
+  return (
+    <>
+      <Row>
+        <DetailRow label="Connection" value={networkLabel(network)} />
+        <DetailRow label="This laptop's AI" value={deviceStatus === 'available' ? 'Ready' : 'Not ready'} />
+        <DetailRow label="Data saver" value={saver} />
+      </Row>
+      <Row note={log.length > 0 ? 'latest' : undefined}>
+        {log.length === 0 ? (
+          <p className="on-lines font-sans text-[0.8rem] text-pencil">Decisions will appear here as you study.</p>
+        ) : (
+          log.map((entry) => (
+            <p key={entry.id} className="on-lines font-sans text-[0.8rem] text-pencil">
+              <span className="font-[560] text-ink">
+                {TASK_LABELS[entry.task]}: {entry.target === 'on_device' ? 'this laptop' : 'cloud'}
+              </span>
+              {' · '}
+              {entry.reason}
+            </p>
+          ))
+        )}
+      </Row>
+    </>
+  )
 }
 
 /**
  * The student's choice of where AI runs, written on the ruled line like options on a
  * question paper: the chosen one is underlined in red, and the margin records where
- * requests will actually go right now.
+ * everyday requests will go right now.
  */
-export function RunOnSwitch({ online, deviceStatus }: { online: boolean; deviceStatus: OnDeviceStatus | null }) {
+export function RunOnSwitch({ deviceStatus }: { deviceStatus: OnDeviceStatus | null }) {
   const runOn = useRunOn()
+  const network = useNetwork()
+  const [showDetails, setShowDetails] = useState(false)
+  const deviceReady = deviceStatus === 'available'
   const unavailable: Partial<Record<RunOn, string>> = {}
-  if (deviceStatus !== 'available') unavailable.on_device = "This laptop's AI is not ready"
-  if (!online) unavailable.in_cloud = 'You are offline'
+  if (!deviceReady) unavailable.on_device = "This laptop's AI is not ready"
+  if (network.quality === 'offline') unavailable.in_cloud = 'You are offline'
 
-  const decision = decide({ task: 'ask', force: forcedTarget(runOn), onDeviceStatus: deviceStatus, online })
+  const decision = decide({ task: 'summarise', force: forcedTarget(runOn), onDeviceStatus: deviceStatus, network })
   const problem = unavailable[runOn]
     ? `${unavailable[runOn]}. Choose another option.`
     : decision
       ? null
       : "You are offline, and this laptop's AI is not ready."
   const target = problem ? null : (decision?.target ?? null)
-  const help = problem ?? (target ? (runOn === 'auto' ? AUTO_HELP : RUN_ON_HELP)[target] : '')
+  const help = problem ?? (runOn === 'auto' ? autoHelp(network, deviceReady) : CHOICE_HELP[runOn])
 
   return (
     <>
@@ -218,7 +272,18 @@ export function RunOnSwitch({ online, deviceStatus }: { online: boolean; deviceS
       </Row>
       <Row>
         <p className={`on-lines font-sans text-[0.8rem] ${problem ? 'text-margin' : 'text-pencil'}`}>{help}</p>
+        <p className="on-lines">
+          <button
+            type="button"
+            onClick={() => setShowDetails((open) => !open)}
+            aria-expanded={showDetails}
+            className="font-sans text-[0.8rem] font-[560] text-pencil hover:text-ink"
+          >
+            {showDetails ? 'Hide how it decides' : 'How it decides'}
+          </button>
+        </p>
       </Row>
+      {showDetails && <RouterDetails deviceStatus={deviceStatus} runOn={runOn} network={network} />}
     </>
   )
 }

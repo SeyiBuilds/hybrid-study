@@ -257,7 +257,6 @@ function PageControls({ current, total, onGo }: { current: number; total: number
 }
 
 interface Connectivity {
-  online: boolean
   deviceStatus: OnDeviceStatus | null
 }
 
@@ -454,13 +453,12 @@ function ReaderView({
       >
         <article className="ruled relative min-h-full" aria-label={`Study sheet for page ${current}`}>
           <div style={{ paddingTop: 'var(--line)', paddingBottom: 'calc(var(--line) * 3)' }}>
-            <RunOnSwitch online={connectivity.online} deviceStatus={connectivity.deviceStatus} />
+            <RunOnSwitch deviceStatus={connectivity.deviceStatus} />
             <Gap />
             <SummarySection
               documentId={summary.id}
               title={summary.title}
               page={page}
-              online={connectivity.online}
               deviceStatus={connectivity.deviceStatus}
             />
             <Gap />
@@ -469,7 +467,6 @@ function ReaderView({
               documentId={summary.id}
               title={summary.title}
               page={page}
-              online={connectivity.online}
               deviceStatus={connectivity.deviceStatus}
             />
             <Gap />
@@ -477,7 +474,7 @@ function ReaderView({
               documentId={summary.id}
               title={summary.title}
               page={page}
-              online={connectivity.online}
+              pages={content.pages}
               deviceStatus={connectivity.deviceStatus}
               prefill={askPrefill}
             />

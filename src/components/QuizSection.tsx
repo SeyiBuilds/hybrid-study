@@ -6,6 +6,7 @@ import { buildQuizPrompt, generateQuiz, quizJobKey } from '../ai/quizzes'
 import { dataSize, seconds } from '../lib/format'
 import { getPageQuiz, savePageQuiz, type PageQuiz } from '../lib/library'
 import type { PageText } from '../lib/pageText'
+import { useNetwork } from '../lib/network'
 import { forcedTarget, useRunOn } from '../lib/runOn'
 import { Row, Working } from './sheet'
 import { pillButton, previewRun, quietButton, textButton } from './sheetStyles'
@@ -212,17 +213,16 @@ export function QuizSection({
   documentId,
   title,
   page,
-  online,
   deviceStatus,
 }: {
   documentId: string
   title: string
   page: PageText
-  online: boolean
   deviceStatus: OnDeviceStatus | null
 }) {
   const job = useJob<PageQuiz>(quizJobKey(documentId, page.number))
   const runOn = useRunOn()
+  const network = useNetwork()
   const [saved, setSaved] = useState<PageQuiz | null | undefined>(undefined)
   const [local, setLocal] = useState<PageQuiz | null>(null)
   const [justMarked, setJustMarked] = useState(false)
@@ -242,7 +242,7 @@ export function QuizSection({
   const preview = previewRun({
     task: 'quiz',
     runOn,
-    online,
+    network,
     deviceStatus,
     prompt: buildQuizPrompt({ pageText: page.text, title, page: page.number }),
     expectedAnswerChars: EXPECTED_QUIZ_CHARS,

@@ -4,6 +4,7 @@ import { dismissJob, useJob } from '../ai/jobs'
 import { buildSummaryPrompt, summarisePage, summaryJobKey } from '../ai/summaries'
 import { getPageSummary, savePageSummary, type PageSummary } from '../lib/library'
 import { hasUsableText, type PageText } from '../lib/pageText'
+import { useNetwork } from '../lib/network'
 import { forcedTarget, useRunOn } from '../lib/runOn'
 import { AiText, MarginMarks, Row, Working } from './sheet'
 import { penField, pillButton, previewRun, quietButton, textButton } from './sheetStyles'
@@ -21,18 +22,17 @@ export function SummarySection({
   documentId,
   title,
   page,
-  online,
   deviceStatus,
 }: {
   documentId: string
   title: string
   page: PageText
-  online: boolean
   deviceStatus: OnDeviceStatus | null
 }) {
   const key = summaryJobKey(documentId, page.number)
   const job = useJob<PageSummary>(key)
   const runOn = useRunOn()
+  const network = useNetwork()
   const [saved, setSaved] = useState<{ key: string; summary: PageSummary | null } | null>(null)
   const [draft, setDraft] = useState<string | null>(null)
 
@@ -52,7 +52,7 @@ export function SummarySection({
   const preview = previewRun({
     task: 'summarise',
     runOn,
-    online,
+    network,
     deviceStatus,
     prompt: buildSummaryPrompt({ pageText: page.text, title, page: page.number }),
   })

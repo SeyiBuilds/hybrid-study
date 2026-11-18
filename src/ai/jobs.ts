@@ -5,7 +5,8 @@
 import { useSyncExternalStore } from 'react'
 import { describeError, type OutputFormat, type Target } from './client'
 import { BadOutputError } from './errors'
-import { ask, type AskResult, type Task } from './router'
+import type { Difficulty } from './difficulty'
+import { ask, type AskResult, type RouteDecision, type Task } from './router'
 
 export type Job<R, M = undefined> =
   | { status: 'running'; key: string; target: Target | null; startedAt: number; meta: M }
@@ -60,6 +61,7 @@ export async function runAiJob<R, M>({
   key,
   prompt,
   task,
+  difficulty,
   format,
   force,
   meta,
@@ -67,8 +69,9 @@ export async function runAiJob<R, M>({
   save,
 }: {
   key: string
-  prompt: string
+  prompt: string | ((decision: RouteDecision) => string)
   task: Task
+  difficulty?: Difficulty
   format?: OutputFormat
   force?: Target
   meta: M
@@ -84,6 +87,7 @@ export async function runAiJob<R, M>({
     for (let attempt = 0; ; attempt++) {
       const result = await ask(prompt, {
         task,
+        difficulty,
         format,
         force,
         // Generation still streams under the hood (for timing); nothing is shown until it is complete.

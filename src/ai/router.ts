@@ -2,12 +2,17 @@
  * Decides, per request, whether generation runs on-device or in the cloud.
  * Every generation call in the app goes through `ask()`.
  *
- * Current rules (network, task difficulty, device speed, Data Saver and
- * Remote Config thresholds come in the router steps of the build order):
- *   1. A forced target wins (the Connection details screen uses this).
- *   2. Offline and no on-device model: nothing can answer yet.
- *   3. On-device model ready: run on-device (free, private, works offline).
- *   4. Otherwise: run in the cloud.
+ * Decision order:
+ *   0. The student's own choice ("This laptop" or "Cloud") wins.
+ *   1. No on-device model and offline: nothing can answer yet.
+ *   2. No on-device model: cloud.
+ *   3. Offline: on-device (a slow answer beats no answer).
+ *   4. Browser data saver on: on-device.
+ *   5. Hard question on a solid connection: cloud.
+ *   6. Simple task, device fast enough: on-device.
+ *   7. Otherwise: cloud if the connection is usable, else on-device.
+ *
+ * Device speed is measured in the next router step; until then the device counts as fast enough.
  */
 import {
   generateStream,
@@ -17,21 +22,38 @@ import {
   type OutputFormat,
   type Target,
 } from './client'
+import type { Difficulty } from './difficulty'
+import { logRoute } from './routeLog'
+import { readNetwork, type NetworkState } from '../lib/network'
 
 export type Task = 'summarise' | 'ask' | 'quiz' | 'connection-test'
 
+export type RouteCause =
+  | 'student-choice'
+  | 'no-device-model'
+  | 'offline'
+  | 'data-saver'
+  | 'hard-task'
+  | 'simple-task'
+  | 'slow-device'
+  | 'weak-connection'
+
 export interface RouteDecision {
   target: Target
-  /** Short human-readable reason, shown in the margin notes and Connection details. */
+  cause: RouteCause
+  /** Short human-readable reason, shown under "How it decides". */
   reason: string
 }
 
 export interface RouteInput {
   task: Task
-  /** Forces a target, e.g. from the Connection details screen. */
+  difficulty?: Difficulty
+  /** The student's explicit choice, or a forced target from Connection details. */
   force?: Target
   onDeviceStatus: OnDeviceStatus | null
-  online: boolean
+  network: NetworkState
+  /** Whether this device runs the model quickly enough for everyday tasks. */
+  deviceFast?: boolean
 }
 
 /** Thrown when no model can answer right now (offline and no on-device model). */
@@ -43,12 +65,36 @@ export class NoRouteError extends Error {
 }
 
 /** Pure decision: also used to tell the student where a request will run before they press the button. */
-export function decide({ force, onDeviceStatus, online }: RouteInput): RouteDecision | null {
-  if (force) return { target: force, reason: force === 'on_device' ? 'you chose this laptop' : 'you chose the cloud' }
-  const deviceReady = onDeviceStatus === 'available'
-  if (!online && !deviceReady) return null
-  if (deviceReady) return { target: 'on_device', reason: online ? 'on-device ready' : 'offline' }
-  return { target: 'in_cloud', reason: 'on-device unavailable' }
+export function decide({
+  difficulty = 'simple',
+  force,
+  onDeviceStatus,
+  network,
+  deviceFast = true,
+}: RouteInput): RouteDecision | null {
+  if (force) {
+    return {
+      target: force,
+      cause: 'student-choice',
+      reason: force === 'on_device' ? 'you chose this laptop' : 'you chose the cloud',
+    }
+  }
+  const offline = network.quality === 'offline'
+  if (onDeviceStatus !== 'available') {
+    return offline ? null : { target: 'in_cloud', cause: 'no-device-model', reason: 'on-device unavailable' }
+  }
+  if (offline) return { target: 'on_device', cause: 'offline', reason: 'offline' }
+  if (network.saveData) return { target: 'on_device', cause: 'data-saver', reason: 'data saver on' }
+  if (difficulty === 'hard' && network.quality === 'solid') {
+    return { target: 'in_cloud', cause: 'hard-task', reason: 'hard question + good connection' }
+  }
+  if (difficulty === 'simple' && deviceFast) return { target: 'on_device', cause: 'simple-task', reason: 'simple task' }
+  if (network.usable) {
+    return difficulty === 'hard'
+      ? { target: 'in_cloud', cause: 'hard-task', reason: 'hard question + usable connection' }
+      : { target: 'in_cloud', cause: 'slow-device', reason: 'slow device + usable connection' }
+  }
+  return { target: 'on_device', cause: 'weak-connection', reason: 'connection too weak for the cloud' }
 }
 
 export interface AskResult extends GenerateResult {
@@ -56,9 +102,11 @@ export interface AskResult extends GenerateResult {
 }
 
 export async function ask(
-  prompt: string,
+  /** The prompt, or a function of the decision when the target changes what is sent. */
+  prompt: string | ((decision: RouteDecision) => string),
   options: {
     task: Task
+    difficulty?: Difficulty
     force?: Target
     format?: OutputFormat
     onText: (textSoFar: string) => void
@@ -68,12 +116,15 @@ export async function ask(
 ): Promise<AskResult> {
   const decision = decide({
     task: options.task,
+    difficulty: options.difficulty,
     force: options.force,
     onDeviceStatus: await getOnDeviceStatus(),
-    online: navigator.onLine,
+    network: readNetwork(),
   })
   if (!decision) throw new NoRouteError()
+  logRoute({ task: options.task, target: decision.target, reason: decision.reason })
   options.onDecision?.(decision)
-  const result = await generateStream(prompt, decision.target, options.onText, options.format)
+  const text = typeof prompt === 'function' ? prompt(decision) : prompt
+  const result = await generateStream(text, decision.target, options.onText, options.format)
   return { ...result, decision }
 }

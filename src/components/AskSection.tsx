@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import type { OnDeviceStatus } from '../ai/client'
-import { askAboutPage, askJobPrefix, type AskMeta } from '../ai/asks'
+import { askAboutPage, askJobPrefix, buildAskPrompt, type AskMeta } from '../ai/asks'
+import { classifyQuestion } from '../ai/difficulty'
 import { dismissJob, useJobs } from '../ai/jobs'
-import { askPrompt } from '../ai/prompts'
 import { deleteAnswer, listAnswers, type PageAnswer } from '../lib/library'
 import { hasUsableText, type PageText } from '../lib/pageText'
+import { useNetwork } from '../lib/network'
 import { forcedTarget, useRunOn } from '../lib/runOn'
 import { AiText, MarginMarks, Row, Working } from './sheet'
 import { penField, pillButton, previewRun, quietButton } from './sheetStyles'
@@ -28,19 +29,21 @@ export function AskSection({
   documentId,
   title,
   page,
-  online,
+  pages,
   deviceStatus,
   prefill,
 }: {
   documentId: string
   title: string
   page: PageText
-  online: boolean
+  /** Every page of the document, for cross-page questions. */
+  pages: PageText[]
   deviceStatus: OnDeviceStatus | null
   /** Highlighted words to ask about, sent from the page toolbar. */
   prefill: { quote: string; nonce: number } | null
 }) {
   const runOn = useRunOn()
+  const network = useNetwork()
   const prefix = askJobPrefix(documentId, page.number)
   const jobs = useJobs<PageAnswer, AskMeta>(prefix)
   const [saved, setSaved] = useState<{ prefix: string; answers: PageAnswer[] } | null>(null)
@@ -79,21 +82,20 @@ export function AskSection({
   }, [saved, prefix, jobs])
   const pending = jobs.filter((job) => job.status !== 'done')
 
-  const prompt = askPrompt({ pageText: page.text, title, page: page.number, question: question || 'x', quote: quote ?? undefined })
-  const preview = previewRun({ task: 'ask', runOn, online, deviceStatus, prompt })
+  const input = { documentId, title, page: page.number, pageText: page.text, pages, question: question.trim(), quote: quote ?? undefined }
+  const preview = previewRun({
+    task: 'ask',
+    difficulty: classifyQuestion(input.question).difficulty,
+    runOn,
+    network,
+    deviceStatus,
+    prompt: (target) => buildAskPrompt(input, target),
+  })
   const canAsk = usable && question.trim().length > 1 && !preview.blocked
 
   const submit = () => {
     if (!canAsk) return
-    void askAboutPage({
-      documentId,
-      title,
-      page: page.number,
-      pageText: page.text,
-      question: question.trim(),
-      quote: quote ?? undefined,
-      force: forcedTarget(runOn),
-    })
+    void askAboutPage({ ...input, force: forcedTarget(runOn) })
     setQuestion('')
     clearQuote()
   }
