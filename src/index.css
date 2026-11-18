@@ -280,7 +280,26 @@ body {
   }
 }
 
+/* Marks written on a script: ticks, crosses and the circled score, drawn one after another. */
+@keyframes pen-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+.pen-draw {
+  stroke-dasharray: 1;
+  animation: pen-draw 260ms ease-out both;
+  animation-delay: var(--delay, 0ms);
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .pen-draw {
+    animation-delay: 0ms !important;
+  }
+
   *,
   *::before,
   *::after {

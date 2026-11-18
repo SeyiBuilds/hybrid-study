@@ -3,7 +3,8 @@
  * answer is shown whole once it is ready (not typed out word by word).
  */
 import { useSyncExternalStore } from 'react'
-import { describeError, type Target } from './client'
+import { describeError, type OutputFormat, type Target } from './client'
+import { BadOutputError } from './errors'
 import { ask, type AskResult, type Task } from './router'
 
 export type Job<R, M = undefined> =
@@ -50,38 +51,58 @@ export function useJobs<R, M = undefined>(prefix: string): Job<R, M>[] {
   })
 }
 
-/** Runs one AI request through the router, then saves the result with `save`. */
+/**
+ * Runs one AI request through the router, then saves the result with `save`.
+ * If the output is unusable (`BadOutputError`), it is requested again up to `retries` times;
+ * the time and data reported cover every attempt.
+ */
 export async function runAiJob<R, M>({
   key,
   prompt,
   task,
+  format,
   force,
   meta,
+  retries = 0,
   save,
 }: {
   key: string
   prompt: string
   task: Task
+  format?: OutputFormat
   force?: Target
   meta: M
+  retries?: number
   save: (result: AskResult) => Promise<R>
 }): Promise<void> {
   if (jobs.get(key)?.status === 'running') return
-  let running: Job<R, M> = { status: 'running', key, target: null, startedAt: Date.now(), meta }
+  const startedAt = Date.now()
+  let running: Job<R, M> = { status: 'running', key, target: null, startedAt, meta }
   set(running)
+  let bytes = 0
   try {
-    const result = await ask(prompt, {
-      task,
-      force,
-      // Generation still streams under the hood (for timing); nothing is shown until it is complete.
-      onText: () => {},
-      onDecision: (decision) => {
-        running = { ...running, target: decision.target } as Job<R, M>
-        set(running)
-      },
-    })
-    if (!result.text.trim()) throw new Error('The model returned an empty answer. Try again.')
-    set({ status: 'done', key, result: await save(result), meta })
+    for (let attempt = 0; ; attempt++) {
+      const result = await ask(prompt, {
+        task,
+        format,
+        force,
+        // Generation still streams under the hood (for timing); nothing is shown until it is complete.
+        onText: () => {},
+        onDecision: (decision) => {
+          running = { ...running, target: decision.target } as Job<R, M>
+          set(running)
+        },
+      })
+      bytes += result.bytes
+      try {
+        if (!result.text.trim()) throw new BadOutputError('The model returned an empty answer. Try again.')
+        const saved = await save({ ...result, bytes, totalMs: Date.now() - startedAt })
+        set({ status: 'done', key, result: saved, meta })
+        return
+      } catch (error) {
+        if (!(error instanceof BadOutputError) || attempt >= retries) throw error
+      }
+    }
   } catch (error) {
     set({ status: 'error', key, message: describeError(error), meta })
   }

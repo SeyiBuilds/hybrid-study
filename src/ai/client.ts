@@ -14,9 +14,13 @@ import {
   InferenceSource,
   type LanguageModelCreateOptions,
 } from 'firebase/ai'
+import { quizSchema } from './quiz'
 import { app } from '../firebase'
 
 export type Target = 'on_device' | 'in_cloud'
+
+/** What the model should return. Configuration is fixed per model, so each format has its own pair. */
+export type OutputFormat = 'text' | 'quiz'
 
 /** Status of Chrome's built-in model, plus 'unsupported' when the Prompt API is missing entirely. */
 export type OnDeviceStatus = 'available' | 'downloadable' | 'downloading' | 'unavailable' | 'unsupported'
@@ -44,6 +48,27 @@ const cloudModel = getGenerativeModel(ai, {
   mode: InferenceMode.ONLY_IN_CLOUD,
   inCloudParams: { model: CLOUD_MODEL },
 })
+
+const quizOnDeviceModel = getGenerativeModel(ai, {
+  mode: InferenceMode.ONLY_ON_DEVICE,
+  onDeviceParams: {
+    createOptions: onDeviceCreateOptions,
+    promptOptions: { responseConstraint: quizSchema },
+  },
+})
+
+const quizCloudModel = getGenerativeModel(ai, {
+  mode: InferenceMode.ONLY_IN_CLOUD,
+  inCloudParams: {
+    model: CLOUD_MODEL,
+    generationConfig: { responseMimeType: 'application/json', responseSchema: quizSchema },
+  },
+})
+
+const models = {
+  text: { on_device: onDeviceModel, in_cloud: cloudModel },
+  quiz: { on_device: quizOnDeviceModel, in_cloud: quizCloudModel },
+}
 
 /** Minimal shape of Chrome's global `LanguageModel`, used only for availability checks. */
 interface ChromeLanguageModel {
@@ -150,13 +175,14 @@ async function stream(
   prompt: string,
   target: Target,
   onText: (textSoFar: string) => void,
+  format: OutputFormat,
 ): Promise<GenerateResult> {
   if (target === 'on_device') {
     const status = await getOnDeviceStatus()
     if (status !== 'available') throw new OnDeviceNotReadyError(status)
   }
 
-  const model = target === 'on_device' ? onDeviceModel : cloudModel
+  const model = models[format][target]
   const started = performance.now()
   let firstChunkMs: number | null = null
   let text = ''
@@ -190,9 +216,10 @@ export function generateStream(
   prompt: string,
   target: Target,
   onText: (textSoFar: string) => void,
+  format: OutputFormat = 'text',
 ): Promise<GenerateResult> {
-  if (target === 'on_device') return runOnDeviceInOrder(() => stream(prompt, target, onText))
-  return stream(prompt, target, onText)
+  if (target === 'on_device') return runOnDeviceInOrder(() => stream(prompt, target, onText, format))
+  return stream(prompt, target, onText, format)
 }
 
 /** Turns SDK errors into a message a student (or Seyi during setup) can act on. */

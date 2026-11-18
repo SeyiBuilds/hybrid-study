@@ -40,6 +40,25 @@ export function askPrompt({
   ].join('\n')
 }
 
+export function quizPrompt({ pageText, title, page }: { pageText: string; title: string; page: number }): string {
+  return [
+    'You write exam practice questions for a university student from their lecture notes.',
+    'Write exactly 5 multiple-choice questions that test understanding of the page below.',
+    '- Use only facts stated on the page.',
+    '- Give each question 4 short options. Exactly one is correct; the other three must be believable but wrong according to the page.',
+    '- "answer" is the letter of the correct option: A, B, C or D.',
+    '- "explanation" is one short sentence saying why that answer is correct.',
+    '- Do not ask about page numbers, headings or the course title.',
+    'Reply with JSON only.',
+    '',
+    `Notes: ${title}, page ${page}`,
+    'Page text:',
+    '"""',
+    trimPage(pageText),
+    '"""',
+  ].join('\n')
+}
+
 export function summarisePrompt({ pageText, title, page }: { pageText: string; title: string; page: number }): string {
   return [
     'You help a university student revise from their lecture notes.',

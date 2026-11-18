@@ -5,6 +5,7 @@ import { MarkToolbar, type ToolbarTarget } from '../components/MarkToolbar'
 import { NotesSection } from '../components/NotesSection'
 import { PdfPage, type PageSelection } from '../components/PdfPage'
 import { Gap, RunOnSwitch } from '../components/sheet'
+import { QuizSection } from '../components/QuizSection'
 import { SummarySection } from '../components/SummarySection'
 import { newId } from '../lib/highlights'
 import {
@@ -456,6 +457,15 @@ function ReaderView({
             <RunOnSwitch online={connectivity.online} deviceStatus={connectivity.deviceStatus} />
             <Gap />
             <SummarySection
+              documentId={summary.id}
+              title={summary.title}
+              page={page}
+              online={connectivity.online}
+              deviceStatus={connectivity.deviceStatus}
+            />
+            <Gap />
+            <QuizSection
+              key={`${summary.id}:${current}`}
               documentId={summary.id}
               title={summary.title}
               page={page}

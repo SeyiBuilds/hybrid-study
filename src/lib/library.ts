@@ -4,6 +4,7 @@
  * only rewrites a few bytes. Nothing here leaves the browser.
  */
 import type { PageText } from './pdf'
+import type { QuizQuestion } from '../ai/quiz'
 
 export interface DocumentSummary {
   id: string
@@ -73,6 +74,25 @@ export interface PageNote {
   updatedAt: number
 }
 
+export interface PageQuiz {
+  /** `${documentId}:${pageNumber}`: one current quiz per page. */
+  key: string
+  documentId: string
+  page: number
+  questions: QuizQuestion[]
+  /** The option chosen for each question, or null if unanswered. */
+  answers: Array<number | null>
+  checkedAt: number | null
+  score: number | null
+  /** Every marked attempt at these questions. */
+  scores: number[]
+  source: 'on_device' | 'in_cloud'
+  totalMs: number
+  bytes: number
+  createdAt: number
+  updatedAt: number
+}
+
 export interface PageAnswer {
   id: string
   documentId: string
@@ -88,15 +108,16 @@ export interface PageAnswer {
 }
 
 const DB_NAME = 'hybrid-study'
-const DB_VERSION = 3
+const DB_VERSION = 4
 const META = 'documents'
 const CONTENT = 'documentContent'
 const SUMMARIES = 'summaries'
 const HIGHLIGHTS = 'highlights'
 const NOTES = 'notes'
 const ANSWERS = 'answers'
+const QUIZZES = 'quizzes'
 /** Stores holding per-page study material, each indexed by documentId and docPage. */
-const PAGE_STORES = [SUMMARIES, HIGHLIGHTS, NOTES, ANSWERS]
+const PAGE_STORES = [SUMMARIES, HIGHLIGHTS, NOTES, ANSWERS, QUIZZES]
 
 let dbPromise: Promise<IDBDatabase> | null = null
 
@@ -117,6 +138,7 @@ function openDb(): Promise<IDBDatabase> {
       ensure(HIGHLIGHTS, 'id')
       ensure(NOTES, 'key')
       ensure(ANSWERS, 'id')
+      ensure(QUIZZES, 'key')
     }
     request.onsuccess = () => {
       const db = request.result
@@ -272,6 +294,17 @@ export async function getNote(documentId: string, page: number): Promise<PageNot
 
 export function saveNote(documentId: string, page: number, text: string): Promise<PageNote> {
   return put(NOTES, { key: summaryKey(documentId, page), documentId, page, text, updatedAt: Date.now() })
+}
+
+export async function getPageQuiz(documentId: string, page: number): Promise<PageQuiz | undefined> {
+  const db = await openDb()
+  return promisify(
+    db.transaction(QUIZZES).objectStore(QUIZZES).get(summaryKey(documentId, page)) as IDBRequest<PageQuiz | undefined>,
+  )
+}
+
+export function savePageQuiz(quiz: Omit<PageQuiz, 'key'>): Promise<PageQuiz> {
+  return put(QUIZZES, { ...quiz, key: summaryKey(quiz.documentId, quiz.page) })
 }
 
 export async function listAnswers(documentId: string, page: number): Promise<PageAnswer[]> {

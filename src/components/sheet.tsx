@@ -104,7 +104,15 @@ function useElapsed(since: number): number {
 }
 
 /** Shown while the AI works: where it is running, a running clock, and a line being drawn. */
-export function Working({ target, startedAt }: { target: Target | null; startedAt: number }) {
+export function Working({
+  target,
+  startedAt,
+  deviceMessage = 'Working on this laptop. This can take a little while.',
+}: {
+  target: Target | null
+  startedAt: number
+  deviceMessage?: string
+}) {
   const elapsed = useElapsed(startedAt)
   return (
     <div className="relative" role="status">
@@ -117,7 +125,7 @@ export function Working({ target, startedAt }: { target: Target | null; startedA
       <div className="past-margin pr-5 sm:pr-8">
         <p className="on-lines font-sans text-[0.88rem] text-pencil">
           {target === 'on_device'
-            ? 'Working on this laptop. This can take a little while.'
+            ? deviceMessage
             : target
               ? 'Working in the cloud…'
               : 'Choosing where to run…'}

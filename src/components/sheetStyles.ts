@@ -26,12 +26,15 @@ export function previewRun({
   online,
   deviceStatus,
   prompt,
+  expectedAnswerChars,
 }: {
   task: Task
   runOn: RunOn
   online: boolean
   deviceStatus: OnDeviceStatus | null
   prompt: string
+  /** Rough answer length, for the data estimate. */
+  expectedAnswerChars?: number
 }): RunPreview {
   const decision = decide({ task, force: forcedTarget(runOn), onDeviceStatus: deviceStatus, online })
   if (!decision) return { text: 'You are offline, and this browser cannot run AI on the device.', blocked: true }
@@ -43,7 +46,7 @@ export function previewRun({
   }
   if (!online) return { text: 'You are offline. Choose Auto or This laptop above.', blocked: true }
   return {
-    text: `Runs in the cloud and uses about ${dataSize(estimateCloudBytesFor(prompt), { approximate: false })} of data.`,
+    text: `Runs in the cloud and uses about ${dataSize(estimateCloudBytesFor(prompt, expectedAnswerChars), { approximate: false })} of data.`,
     blocked: false,
   }
 }

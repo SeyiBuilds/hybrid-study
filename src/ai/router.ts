@@ -14,10 +14,11 @@ import {
   getOnDeviceStatus,
   type GenerateResult,
   type OnDeviceStatus,
+  type OutputFormat,
   type Target,
 } from './client'
 
-export type Task = 'summarise' | 'ask' | 'connection-test'
+export type Task = 'summarise' | 'ask' | 'quiz' | 'connection-test'
 
 export interface RouteDecision {
   target: Target
@@ -59,6 +60,7 @@ export async function ask(
   options: {
     task: Task
     force?: Target
+    format?: OutputFormat
     onText: (textSoFar: string) => void
     /** Called once the router has picked a target, before generation starts. */
     onDecision?: (decision: RouteDecision) => void
@@ -72,6 +74,6 @@ export async function ask(
   })
   if (!decision) throw new NoRouteError()
   options.onDecision?.(decision)
-  const result = await generateStream(prompt, decision.target, options.onText)
+  const result = await generateStream(prompt, decision.target, options.onText, options.format)
   return { ...result, decision }
 }
