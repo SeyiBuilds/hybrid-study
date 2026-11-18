@@ -4,7 +4,7 @@ A study companion for students with patchy, expensive internet. Open a lecture P
 
 Built for the [#BuildHybridAI 2026 hackathon](https://firebasehybridaihackathon.devpost.com/) with [Firebase AI Logic](https://firebase.google.com/docs/ai-logic/hybrid-on-device-inference) hybrid inference (Gemini Nano in Chrome + Gemini in the cloud).
 
-> **Status:** in active development. Working now: open a lecture PDF, highlight and take notes on it, then summarise, question and quiz yourself on any page, on the device or in the cloud. The full routing rules are next. See [BUILD_LOG.md](BUILD_LOG.md) for progress.
+> **Status:** in active development. Working now: open a lecture PDF, highlight and take notes on it, then summarise, question and quiz yourself on any page, with a router that picks the device or the cloud for each request. Device-speed measurement and the data-saved counter are next. See [BUILD_LOG.md](BUILD_LOG.md) for progress.
 
 ## Features
 
@@ -14,14 +14,15 @@ Built for the [#BuildHybridAI 2026 hackathon](https://firebasehybridaihackathon.
 - **Summarise a page.** 3 to 5 bullets, shown whole when ready. Each answer records where it ran, how long it took and roughly how much data it used, in the margin.
 - **Quiz me.** Five multiple-choice questions from the page. Choose your answers, then the sheet marks them like a script: ticks and crosses in the margin, a circled score and a short explanation for each question. Quizzes and scores are saved on the device.
 - **Ask about this page.** Type a question, or ask about highlighted words. Answers are kept on the sheet.
-- **Run AI on: Auto, This laptop or Cloud.** Auto lets the router decide per request (Gemini Nano on the device when it can, the cloud when it must). The sheet says where a request will run and what it will cost before you press the button.
+- **Run AI on: Auto, This laptop or Cloud.** Auto lets the router decide per request from the connection (offline, slow or solid), how hard the task is, the browser's data saver and whether the on-device model is ready. Simple tasks stay on the laptop, and hard questions use the cloud when the connection allows. The sheet says where a request will run, why and what it will cost before you press the button, and "How it decides" lists recent decisions with their reasons.
 - **Kept on your device.** Documents, highlights, notes, summaries and answers are stored in the browser (IndexedDB), work offline and remember the page you were on. Nothing is uploaded when you open a file.
 - **Connection details.** Opened from the status indicator in the top bar: sends the same question to Gemini Nano in Chrome and to Gemini in the cloud, showing where each answer ran and how long it took.
 
 ## How Firebase AI Logic is used
 
 - `src/ai/client.ts` creates two Firebase AI Logic models with the Gemini Developer API backend: one pinned to `InferenceMode.ONLY_ON_DEVICE` (Gemini Nano through Chrome's Prompt API) and one pinned to `InferenceMode.ONLY_IN_CLOUD`. Requests use `generateContentStream` (for time-to-first-token), answers are shown whole, and `response.inferenceSource` confirms where each one ran. On-device requests run one at a time.
-- `src/ai/router.ts` is the single entry point for generation. It decides per request which model to use (or follows the student's "Run AI on" choice) and returns a short reason string.
+- `src/ai/router.ts` is the single entry point for generation. It decides per request which model to use (or follows the student's "Run AI on" choice) and returns a short reason string. Inputs come from `navigator.connection` (`src/lib/network.ts`), question difficulty (`src/ai/difficulty.ts`) and on-device availability; thresholds live in `src/ai/routerConfig.ts`.
+- Cross-page questions routed to the cloud get text from nearby pages of the document. On-device requests stay within the current page.
 - Quizzes use structured output: one `Schema` is passed as `responseConstraint` on-device and `responseSchema` in the cloud (`src/ai/quiz.ts`). Every reply is still parsed and validated, and an unusable reply is requested once more.
 - App Check protects the cloud calls (debug provider in development).
 
@@ -92,6 +93,10 @@ Built for the [#BuildHybridAI 2026 hackathon](https://firebasehybridaihackathon.
 src/
   ai/client.ts            Firebase AI Logic models, on-device availability, streaming
   ai/router.ts            Per-request on-device vs cloud decision
+  ai/routerConfig.ts      Router thresholds
+  ai/difficulty.ts        Simple or hard: judging a question from its wording
+  ai/routeLog.ts          Recent routing decisions
+  lib/network.ts          Live connection quality from the browser
   ai/prompts.ts           Prompts sized for Gemini Nano's on-device limits
   ai/jobs.ts              AI requests in progress (kept alive across page turns)
   ai/summaries.ts         Page summaries

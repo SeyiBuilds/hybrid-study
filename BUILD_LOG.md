@@ -11,11 +11,21 @@ What was built each day, what broke, and what we changed and why. Newest day fir
   - You circle answers in biro-blue. "Mark my answers" then adds red ticks and crosses in the margin, a circled score, the right answers and a short explanation for each question.
   - Quizzes, answers and scores are saved per page on the device. They survive reloads, and you can retry the same questions or ask for new ones.
   - Pages without enough real text, such as a contents page, don't offer a quiz.
+  - Confirmed working in Chrome with the real models.
+- **Router v1.** Auto now decides per request from four things: whether the on-device model is ready, the connection (offline, slow or solid, plus whether the cloud is usable at all), how hard the task is, and the browser's data saver.
+  - Simple tasks stay on the laptop. Hard questions go to the cloud when the connection allows.
+  - The student's own "This laptop" or "Cloud" choice always wins.
+  - Each section says where a request will run and why before you press the button. As you type a question, the line changes if it counts as hard.
+  - "How it decides" shows what the router sees and its last five decisions with reasons.
+  - Cross-page questions sent to the cloud include text from nearby pages.
 
 ### What broke
 - The labels in the old pill-shaped switch sat too low and were cut off. The buttons were 20 px tall but inherited the sheet's 30 px line height.
 
 ### What we changed and why
+- **Routing rules follow the project brief's order,** in one pure function, so the same logic drives both the real request and the preview shown before it. Thresholds sit in one file, ready for Remote Config.
+- **Question difficulty uses wording, not AI.** Asking a model whether a question is hard would cost the time or data the router is trying to save. Multi-step wording, references to other pages and very long questions count as hard.
+- **Device speed is assumed fast enough for now.** The benchmark arrives in Router v2, and the rule that uses it is already in place.
 - **One schema, both models.** Firebase's hybrid guide passes the same `Schema` to `responseConstraint` and `responseSchema`. Model configuration is fixed per instance, so quizzes have their own on-device and cloud models.
 - **Validate everything.** A schema doesn't guarantee a usable quiz. Each reply is parsed and checked for four distinct options and a real answer. Bad questions are dropped, at least three must survive, and an unusable reply is requested once more.
 - **The answer is a letter, and options are shuffled in code,** because small models tend to put the right answer first. Options like "All of the above" keep their order.
@@ -24,8 +34,8 @@ What was built each day, what broke, and what we changed and why. Newest day fir
 - **Tested in headless Chrome** across every state: each choice, keyboard, offline, no on-device AI, light and dark themes.
 
 ### Still open
-- Try the quiz with the real Gemini Nano and cloud model in Chrome. Automated tests used scripted model replies, so question quality and on-device speed are still unmeasured.
-- Router v1 is next.
+- Try Router v1 in Chrome with DevTools network throttling and with Wi-Fi off. Automated tests used simulated connections and scripted model replies.
+- Router v2 is next: device speed benchmark, session warm-up, answer badges and the data-saved counter.
 - Hosting comes at the deploy step. Until then the app needs the local dev server; after that, students just open a link.
 
 ## Mon 16 Nov 2026
