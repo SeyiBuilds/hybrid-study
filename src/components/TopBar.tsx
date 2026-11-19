@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react'
 import type { OnDeviceStatus } from '../ai/client'
+import { useDataLedger } from '../lib/dataLedger'
+import { dataSize } from '../lib/format'
 import { routes } from '../lib/useHashRoute'
 
 function Mark() {
@@ -56,6 +58,22 @@ export function StatusPill({ online, deviceStatus }: { online: boolean; deviceSt
   )
 }
 
+/** The running total of data saved by answering on this laptop instead of the cloud. */
+function DataSaved() {
+  const ledger = useDataLedger()
+  if (ledger.onDeviceAnswers === 0) return null
+  return (
+    <a
+      href={`${routes.diagnostics}`}
+      title={`Saved by answering ${ledger.onDeviceAnswers} ${ledger.onDeviceAnswers === 1 ? 'request' : 'requests'} on this laptop instead of the cloud`}
+      className="figures flex shrink-0 items-baseline gap-1.5 rounded-full px-3 py-1.5 text-[0.8rem] text-pencil transition-colors hover:bg-sheet hover:text-ink"
+    >
+      <span className="font-[680] text-local">{dataSize(ledger.savedBytes)}</span>
+      <span>saved</span>
+    </a>
+  )
+}
+
 export function TopBar({
   online,
   deviceStatus,
@@ -73,6 +91,7 @@ export function TopBar({
           <span className="display hidden text-[1.15rem] sm:inline">Hybrid Study</span>
         </a>
         <div className="flex min-w-0 flex-1 items-center gap-3">{children}</div>
+        <DataSaved />
         <StatusPill online={online} deviceStatus={deviceStatus} />
       </div>
     </header>

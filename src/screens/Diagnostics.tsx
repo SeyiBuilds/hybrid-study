@@ -8,7 +8,10 @@ import {
   type OnDeviceStatus,
   type Target,
 } from '../ai/client'
+import { measureDeviceSpeed, speedLabel, useDeviceSpeed } from '../ai/deviceSpeed'
 import { ask, type AskResult } from '../ai/router'
+import { resetLedger, useDataLedger } from '../lib/dataLedger'
+import { dataSize, plural } from '../lib/format'
 import { appCheckMode, missingConfigKeys } from '../firebase'
 
 const DEFAULT_PROMPT = 'In one short sentence, what is photosynthesis?'
@@ -32,6 +35,56 @@ function Row({ label, value, ok }: { label: string; value: string; ok: boolean |
         <span className={`truncate font-[580] ${ok === false ? 'text-margin' : ''}`}>{value}</span>
       </p>
     </div>
+  )
+}
+
+function Line({ label, value }: { label: string; value: string }) {
+  return (
+    <p className="past-margin on-lines figures flex justify-between gap-4 pr-5 text-[0.9rem]">
+      <span className="text-pencil">{label}</span>
+      <span className="truncate font-[580]">{value}</span>
+    </p>
+  )
+}
+
+/** The data-saved counter in full, and this laptop's measured speed. */
+function DataAndSpeed({ deviceStatus }: { deviceStatus: OnDeviceStatus | null }) {
+  const ledger = useDataLedger()
+  const speed = useDeviceSpeed()
+  const button = 'font-[620] text-ink underline decoration-margin decoration-2 underline-offset-4 disabled:opacity-40'
+
+  return (
+    <section
+      id="data"
+      aria-label="Data and speed"
+      className="ruled relative mt-8 rounded-[3px] pb-[var(--line)] shadow-[0_1px_0_var(--color-rule)]"
+      style={{ paddingTop: 'var(--line)' }}
+    >
+      <div className="relative">
+        <span className="margin-note text-local">saved</span>
+        <h2 className="past-margin on-lines eyebrow pr-5">Data and speed</h2>
+      </div>
+      <Line
+        label="Saved by answering on this laptop"
+        value={`${dataSize(ledger.savedBytes)} · ${plural(ledger.onDeviceAnswers, 'answer')}`}
+      />
+      <Line label="Used in the cloud" value={`${dataSize(ledger.usedBytes)} · ${plural(ledger.cloudAnswers, 'answer')}`} />
+      <Line label="Counting since" value={new Date(ledger.since).toLocaleDateString('en', { day: 'numeric', month: 'short' })} />
+      <Line label="This laptop's speed" value={speedLabel(speed)} />
+      <p className="past-margin on-lines flex flex-wrap gap-x-5 pr-5 text-[0.85rem]">
+        <button
+          type="button"
+          onClick={() => void measureDeviceSpeed()}
+          disabled={deviceStatus !== 'available' || speed.status === 'measuring'}
+          className={button}
+        >
+          Check this laptop's speed again
+        </button>
+        <button type="button" onClick={resetLedger} className="font-[560] text-pencil hover:text-ink">
+          Reset the counter
+        </button>
+      </p>
+    </section>
   )
 }
 
@@ -152,6 +205,8 @@ export function Diagnostics({
           </div>
         )}
       </section>
+
+      <DataAndSpeed deviceStatus={deviceStatus} />
 
       <section className="mt-8">
         <label htmlFor="prompt" className="eyebrow">

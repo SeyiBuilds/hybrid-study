@@ -12,9 +12,11 @@
  *   6. Simple task, device fast enough: on-device.
  *   7. Otherwise: cloud if the connection is usable, else on-device.
  *
- * Device speed is measured in the next router step; until then the device counts as fast enough.
+ * Device speed comes from a one-off speed check (src/ai/deviceSpeed.ts); until it has run,
+ * the device counts as fast enough.
  */
 import {
+  estimateCloudBytes,
   generateStream,
   getOnDeviceStatus,
   type GenerateResult,
@@ -22,11 +24,16 @@ import {
   type OutputFormat,
   type Target,
 } from './client'
+import { deviceIsFast } from './deviceSpeed'
 import type { Difficulty } from './difficulty'
 import { logRoute } from './routeLog'
+import { recordUsage } from '../lib/dataLedger'
 import { readNetwork, type NetworkState } from '../lib/network'
 
-export type Task = 'summarise' | 'ask' | 'quiz' | 'connection-test'
+export type Task = 'summarise' | 'ask' | 'quiz' | 'connection-test' | 'speed-check'
+
+/** Tasks that measure or test the models rather than help the student; not counted as data saved. */
+const SYSTEM_TASKS: Task[] = ['connection-test', 'speed-check']
 
 export type RouteCause =
   | 'student-choice'
@@ -66,6 +73,7 @@ export class NoRouteError extends Error {
 
 /** Pure decision: also used to tell the student where a request will run before they press the button. */
 export function decide({
+  task,
   difficulty = 'simple',
   force,
   onDeviceStatus,
@@ -76,7 +84,7 @@ export function decide({
     return {
       target: force,
       cause: 'student-choice',
-      reason: force === 'on_device' ? 'you chose this laptop' : 'you chose the cloud',
+      reason: task === 'speed-check' ? 'speed check' : force === 'on_device' ? 'you chose this laptop' : 'you chose the cloud',
     }
   }
   const offline = network.quality === 'offline'
@@ -120,11 +128,21 @@ export async function ask(
     force: options.force,
     onDeviceStatus: await getOnDeviceStatus(),
     network: readNetwork(),
+    deviceFast: deviceIsFast(),
   })
   if (!decision) throw new NoRouteError()
   logRoute({ task: options.task, target: decision.target, reason: decision.reason })
   options.onDecision?.(decision)
   const text = typeof prompt === 'function' ? prompt(decision) : prompt
   const result = await generateStream(text, decision.target, options.onText, options.format)
+  if (!SYSTEM_TASKS.includes(options.task)) {
+    const onDevice = result.source === 'on_device'
+    recordUsage({
+      onDevice,
+      usedBytes: result.bytes,
+      // What the same request would have cost in the cloud.
+      savedBytes: onDevice ? estimateCloudBytes(text, result.text) : 0,
+    })
+  }
   return { ...result, decision }
 }

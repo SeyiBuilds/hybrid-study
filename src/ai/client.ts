@@ -73,6 +73,26 @@ const models = {
 /** Minimal shape of Chrome's global `LanguageModel`, used only for availability checks. */
 interface ChromeLanguageModel {
   availability(options?: LanguageModelCreateOptions): Promise<Exclude<OnDeviceStatus, 'unsupported'>>
+  create?(options?: LanguageModelCreateOptions): Promise<{ destroy(): void }>
+}
+
+let warmSession: { destroy(): void } | null = null
+
+/**
+ * Loads the on-device model into memory when the app opens, so the first real request
+ * doesn't wait for it. Opening an idle session generates nothing; all generation still
+ * goes through Firebase AI Logic.
+ */
+export async function warmUpOnDevice(): Promise<boolean> {
+  if (warmSession) return true
+  const languageModel = chromeLanguageModel()
+  if (!languageModel?.create || (await getOnDeviceStatus()) !== 'available') return false
+  try {
+    warmSession = await languageModel.create(onDeviceCreateOptions)
+    return true
+  } catch {
+    return false
+  }
 }
 
 function chromeLanguageModel(): ChromeLanguageModel | undefined {

@@ -1,5 +1,6 @@
 /** Shared class names and helpers for the ruled study sheet. */
 import { estimateCloudBytesFor, type OnDeviceStatus, type Target } from '../ai/client'
+import { deviceIsFast } from '../ai/deviceSpeed'
 import type { Difficulty } from '../ai/difficulty'
 import { decide, type RouteCause, type Task } from '../ai/router'
 import { dataSize } from '../lib/format'
@@ -50,7 +51,14 @@ export function previewRun({
   /** Rough answer length, for the data estimate. */
   expectedAnswerChars?: number
 }): RunPreview {
-  const decision = decide({ task, difficulty, force: forcedTarget(runOn), onDeviceStatus: deviceStatus, network })
+  const decision = decide({
+    task,
+    difficulty,
+    force: forcedTarget(runOn),
+    onDeviceStatus: deviceStatus,
+    network,
+    deviceFast: deviceIsFast(),
+  })
   if (!decision) return { text: 'You are offline, and this browser cannot run AI on the device.', blocked: true }
   if (decision.target === 'on_device') {
     if (deviceStatus !== 'available') {
@@ -65,7 +73,9 @@ export function previewRun({
     text:
       decision.cause === 'hard-task'
         ? `Hard question, so this runs in the cloud and uses about ${size} of data.`
-        : `Runs in the cloud and uses about ${size} of data.`,
+        : decision.cause === 'slow-device'
+          ? `This laptop is slow at AI, so this runs in the cloud and uses about ${size} of data.`
+          : `Runs in the cloud and uses about ${size} of data.`,
     blocked: false,
   }
 }

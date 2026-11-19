@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { TopBar } from './components/TopBar'
 import { useConnectivity } from './lib/useConnectivity'
+import { useOnDeviceStartup } from './lib/useOnDeviceStartup'
 import { routes, useHashRoute } from './lib/useHashRoute'
 import { Diagnostics } from './screens/Diagnostics'
 import { Library } from './screens/Library'
@@ -11,6 +12,7 @@ const APP_TITLE = 'Hybrid Study: AI study help that keeps working offline'
 export default function App() {
   const route = useHashRoute()
   const { online, deviceStatus, refresh } = useConnectivity()
+  useOnDeviceStartup(deviceStatus)
   const [docTitle, setDocTitle] = useState<string | null>(null)
 
   useEffect(() => {

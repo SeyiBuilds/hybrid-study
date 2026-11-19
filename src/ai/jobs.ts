@@ -28,6 +28,11 @@ function set(job: Job<unknown, unknown>) {
   emit()
 }
 
+/** Whether any AI request is in progress (background work waits for these). */
+export function hasRunningJobs(): boolean {
+  return [...jobs.values()].some((job) => job.status === 'running')
+}
+
 export function dismissJob(key: string) {
   if (jobs.delete(key)) emit()
 }

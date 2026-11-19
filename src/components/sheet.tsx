@@ -1,6 +1,7 @@
 /** Building blocks for the ruled study sheet. */
 import { useEffect, useState, type ReactNode } from 'react'
 import type { OnDeviceStatus, Target } from '../ai/client'
+import { deviceIsFast, speedLabel, useDeviceSpeed } from '../ai/deviceSpeed'
 import { useRouteLog } from '../ai/routeLog'
 import { decide, type Task } from '../ai/router'
 import { parseAiText } from '../ai/summaries'
@@ -156,13 +157,15 @@ const TASK_LABELS: Record<Task, string> = {
   ask: 'Question',
   quiz: 'Quiz',
   'connection-test': 'Connection test',
+  'speed-check': 'Speed check',
 }
 
-function autoHelp(network: NetworkState, deviceReady: boolean): string {
+function autoHelp(network: NetworkState, deviceReady: boolean, deviceFast: boolean): string {
   if (!deviceReady) return "Using the cloud, because this laptop's AI is not ready."
   if (network.quality === 'offline') return "You're offline, so everything runs on this laptop."
   if (network.saveData) return "Your browser's data saver is on, so everything stays on this laptop."
   if (!network.usable) return 'The connection is very weak, so everything stays on this laptop.'
+  if (!deviceFast) return 'This laptop is slow at AI, so requests use the cloud while the connection is good. Choose This laptop to save data.'
   return 'Simple tasks stay on this laptop. Hard questions use the cloud.'
 }
 
@@ -178,12 +181,14 @@ function DetailRow({ label, value }: { label: string; value: string }) {
 /** The router's inputs and its recent decisions, for anyone curious (and for the demo). */
 function RouterDetails({ deviceStatus, runOn, network }: { deviceStatus: OnDeviceStatus | null; runOn: RunOn; network: NetworkState }) {
   const log = useRouteLog()
+  const speed = useDeviceSpeed()
   const saver = runOn === 'on_device' ? 'On (This laptop)' : network.saveData ? 'On (browser)' : 'Off'
   return (
     <>
       <Row>
         <DetailRow label="Connection" value={networkLabel(network)} />
         <DetailRow label="This laptop's AI" value={deviceStatus === 'available' ? 'Ready' : 'Not ready'} />
+        <DetailRow label="This laptop's speed" value={speedLabel(speed)} />
         <DetailRow label="Data saver" value={saver} />
       </Row>
       <Row note={log.length > 0 ? 'latest' : undefined}>
@@ -213,20 +218,21 @@ function RouterDetails({ deviceStatus, runOn, network }: { deviceStatus: OnDevic
 export function RunOnSwitch({ deviceStatus }: { deviceStatus: OnDeviceStatus | null }) {
   const runOn = useRunOn()
   const network = useNetwork()
+  const deviceFast = deviceIsFast(useDeviceSpeed())
   const [showDetails, setShowDetails] = useState(false)
   const deviceReady = deviceStatus === 'available'
   const unavailable: Partial<Record<RunOn, string>> = {}
   if (!deviceReady) unavailable.on_device = "This laptop's AI is not ready"
   if (network.quality === 'offline') unavailable.in_cloud = 'You are offline'
 
-  const decision = decide({ task: 'summarise', force: forcedTarget(runOn), onDeviceStatus: deviceStatus, network })
+  const decision = decide({ task: 'summarise', force: forcedTarget(runOn), onDeviceStatus: deviceStatus, network, deviceFast })
   const problem = unavailable[runOn]
     ? `${unavailable[runOn]}. Choose another option.`
     : decision
       ? null
       : "You are offline, and this laptop's AI is not ready."
   const target = problem ? null : (decision?.target ?? null)
-  const help = problem ?? (runOn === 'auto' ? autoHelp(network, deviceReady) : CHOICE_HELP[runOn])
+  const help = problem ?? (runOn === 'auto' ? autoHelp(network, deviceReady, deviceFast) : CHOICE_HELP[runOn])
 
   return (
     <>
