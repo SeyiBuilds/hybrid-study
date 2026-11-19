@@ -10,8 +10,12 @@ export const ROUTER_DEFAULTS = {
   hardQuestionWords: 25,
   /** How much of the document a cross-page question may send to the cloud. */
   crossPageChars: 20000,
-  /** The on-device model counts as fast enough if the speed check finishes within this time. */
-  deviceFastMaxMs: 8000,
+  /**
+   * The on-device model counts as fast enough if the speed check finishes within this time.
+   * A CPU-only laptop (i7-10610U, no graphics card) measured 7.3 s; 12 s leaves headroom
+   * so a check taken at a busy moment doesn't push everyday work to the cloud.
+   */
+  deviceFastMaxMs: 12000,
 }
 
 export type RouterConfig = typeof ROUTER_DEFAULTS
