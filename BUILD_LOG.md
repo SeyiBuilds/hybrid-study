@@ -2,6 +2,24 @@
 
 What was built each day, what broke, and what we changed and why. Newest day first.
 
+## Thu 19 Nov 2026
+
+### Built
+- **Writing boxes.** The question box, My notes, highlight notes and summary editing now sit in visible boxes, like answer boxes on an exam paper. Each darkens when you click in.
+- **The question box** is two lines tall, says "Type your question here…", and grows as you type.
+- **Ask now comes before Quiz** on the study sheet.
+
+### What broke
+- **No visible place to type a question.** The box was one line of grey placeholder text with no border, so it read as a label, and its outline only appeared after clicking in. Ask also sat below the quiz, so once five questions were showing it ended up far down the sheet.
+
+### What we changed and why
+- **Writing areas get a border and a tinted background.** Blank ruled lines alone weren't enough to say "type here".
+- **The focus style moved into Tailwind's base layer.** Unlayered CSS always beats component styles, so the writing boxes couldn't draw their own focus state until it moved.
+- **Tested in headless Chrome at 1920 px wide** with real mouse and keyboard input. The router and quiz checks still pass.
+
+### Still open
+- Router v1 still needs a real-world check in Chrome: throttled network, Wi-Fi off, the real models.
+
 ## Wed 18 Nov 2026
 
 ### Built
