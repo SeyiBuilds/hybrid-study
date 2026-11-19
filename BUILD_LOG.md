@@ -16,11 +16,15 @@ What was built each day, what broke, and what we changed and why. Newest day fir
 
 ### What broke
 - **No visible place to type a question.** The box was one line of grey placeholder text with no border, so it read as a label, and its outline only appeared after clicking in. Ask also sat below the quiz, so once five questions were showing it ended up far down the sheet.
+- **A test failed on a moving connection estimate.** Chrome's own connection estimate can briefly read as very weak. When it did, the router (correctly) kept work on the laptop, and the test expecting the cloud failed.
 
 ### What we changed and why
 - **Writing areas get a border and a tinted background.** Blank ruled lines alone weren't enough to say "type here".
 - **The focus style moved into Tailwind's base layer.** Unlayered CSS always beats component styles, so the writing boxes couldn't draw their own focus state until it moved.
 - **Tested in headless Chrome at 1920 px wide** with real mouse and keyboard input. The router and quiz checks still pass.
+- **The speed check uses the router,** pinned to the laptop, so all generation still goes through Firebase AI Logic. Only the warm-up touches Chrome's `LanguageModel` directly: it opens an idle session and generates nothing.
+- **Until the speed check has run, the laptop counts as fast,** so nothing spends data on a guess.
+- **Tests now pin the connection,** so they check the rules rather than Chrome's estimate. Speed, router and quiz checks all pass.
 
 ### Still open
 - Router v1 and v2 still need a real-world check in Chrome: throttled network, Wi-Fi off, the real models, and this laptop's actual speed-check time. The 8-second threshold may need tuning.
