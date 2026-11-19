@@ -106,7 +106,7 @@ export function SummarySection({
             aria-label="Edit the summary"
             autoFocus
             className={penField}
-            style={{ minHeight: 'calc(var(--line) * 3)' }}
+            style={{ minHeight: 'calc(var(--line) * 3 + 3px)' }}
           />
         </Row>
         <Row>

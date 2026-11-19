@@ -143,8 +143,9 @@ export function AskSection({
               onKeyDown={onKeyDown}
               rows={1}
               aria-label="Your question"
-              placeholder={quote ? 'What do you want to know about this?' : 'Type a question about this page…'}
+              placeholder={quote ? 'What do you want to know about this?' : 'Type your question here…'}
               className={penField}
+              style={{ minHeight: 'calc(var(--line) * 2 + 3px)' }}
             />
           </Row>
           <Row>

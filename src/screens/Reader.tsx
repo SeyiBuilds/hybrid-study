@@ -462,14 +462,6 @@ function ReaderView({
               deviceStatus={connectivity.deviceStatus}
             />
             <Gap />
-            <QuizSection
-              key={`${summary.id}:${current}`}
-              documentId={summary.id}
-              title={summary.title}
-              page={page}
-              deviceStatus={connectivity.deviceStatus}
-            />
-            <Gap />
             <AskSection
               documentId={summary.id}
               title={summary.title}
@@ -477,6 +469,14 @@ function ReaderView({
               pages={content.pages}
               deviceStatus={connectivity.deviceStatus}
               prefill={askPrefill}
+            />
+            <Gap />
+            <QuizSection
+              key={`${summary.id}:${current}`}
+              documentId={summary.id}
+              title={summary.title}
+              page={page}
+              deviceStatus={connectivity.deviceStatus}
             />
             <Gap />
             <NotesSection

@@ -55,7 +55,7 @@ function PageNotes({ documentId, page }: { documentId: string; page: number }) {
             aria-label="My notes for this page"
             placeholder="Write your own notes for this page. They stay on this laptop."
             className={penField}
-            style={{ minHeight: 'calc(var(--line) * 3)' }}
+            style={{ minHeight: 'calc(var(--line) * 3 + 3px)' }}
           />
         )}
       </Row>

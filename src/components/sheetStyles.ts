@@ -12,9 +12,12 @@ export const textButton =
   'font-sans text-[0.82rem] font-[620] text-ink underline decoration-margin decoration-2 underline-offset-4 disabled:cursor-not-allowed disabled:opacity-40'
 export const quietButton = 'font-sans text-[0.8rem] font-[560] text-pencil hover:text-ink'
 
-/** Text areas the student writes in: blue biro on the ruled lines. */
+/**
+ * Boxes the student writes in, like answer boxes on an exam paper: clearly a place to
+ * type, with blue-biro text that still sits on the sheet's line height.
+ */
 export const penField =
-  'reading on-lines block w-full resize-none border-0 bg-transparent p-0 text-pen outline-none [field-sizing:content] placeholder:text-pencil/70 focus:ring-0'
+  'reading on-lines block w-full cursor-text resize-none rounded-[4px] border-[1.5px] border-rule bg-desk/45 px-2.5 py-0 text-pen outline-none transition-colors [field-sizing:content] placeholder:text-pencil hover:border-pencil/70 focus:border-ink focus:bg-sheet focus-visible:outline-none'
 
 export interface RunPreview {
   text: string
