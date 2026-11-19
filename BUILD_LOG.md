@@ -8,6 +8,11 @@ What was built each day, what broke, and what we changed and why. Newest day fir
 - **Writing boxes.** The question box, My notes, highlight notes and summary editing now sit in visible boxes, like answer boxes on an exam paper. Each darkens when you click in.
 - **The question box** is two lines tall, says "Type your question here…", and grows as you type.
 - **Ask now comes before Quiz** on the study sheet.
+- **Router v2.**
+  - **Speed check.** A short task (summarise one paragraph in a sentence) runs once on the laptop in the background, when no student request is using the model. The result is remembered. If it takes longer than 8 seconds, the laptop counts as slow, and Auto sends everyday tasks to the cloud while the connection is usable. "This laptop" still keeps everything local.
+  - **Warm-up.** The on-device model is loaded into memory when the app opens.
+  - **Data-saved counter.** Each on-device answer adds what the same request would have cost in the cloud (prompt and answer size plus overhead) to a running total in the top bar. Connection details shows data saved, cloud data used, and this laptop's speed, with buttons to check the speed again and to reset the counter. Speed checks and connection tests aren't counted.
+  - The answer badges were already in place: every summary, answer and quiz records where it ran, the time taken and the data used.
 
 ### What broke
 - **No visible place to type a question.** The box was one line of grey placeholder text with no border, so it read as a label, and its outline only appeared after clicking in. Ask also sat below the quiz, so once five questions were showing it ended up far down the sheet.
@@ -18,7 +23,8 @@ What was built each day, what broke, and what we changed and why. Newest day fir
 - **Tested in headless Chrome at 1920 px wide** with real mouse and keyboard input. The router and quiz checks still pass.
 
 ### Still open
-- Router v1 still needs a real-world check in Chrome: throttled network, Wi-Fi off, the real models.
+- Router v1 and v2 still need a real-world check in Chrome: throttled network, Wi-Fi off, the real models, and this laptop's actual speed-check time. The 8-second threshold may need tuning.
+- Offline question queue and Explain this are next.
 
 ## Wed 18 Nov 2026
 

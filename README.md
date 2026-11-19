@@ -4,7 +4,7 @@ A study companion for students with patchy, expensive internet. Open a lecture P
 
 Built for the [#BuildHybridAI 2026 hackathon](https://firebasehybridaihackathon.devpost.com/) with [Firebase AI Logic](https://firebase.google.com/docs/ai-logic/hybrid-on-device-inference) hybrid inference (Gemini Nano in Chrome + Gemini in the cloud).
 
-> **Status:** in active development. Working now: open a lecture PDF, highlight and take notes on it, then summarise, question and quiz yourself on any page, with a router that picks the device or the cloud for each request. Device-speed measurement and the data-saved counter are next. See [BUILD_LOG.md](BUILD_LOG.md) for progress.
+> **Status:** in active development. Working now: open a lecture PDF, highlight and take notes on it, then summarise, question and quiz yourself on any page, with a router that picks the device or the cloud for each request, and a running count of the data saved. The offline question queue is next. See [BUILD_LOG.md](BUILD_LOG.md) for progress.
 
 ## Features
 
@@ -15,6 +15,8 @@ Built for the [#BuildHybridAI 2026 hackathon](https://firebasehybridaihackathon.
 - **Quiz me.** Five multiple-choice questions from the page. Choose your answers, then the sheet marks them like a script: ticks and crosses in the margin, a circled score and a short explanation for each question. Quizzes and scores are saved on the device.
 - **Ask about this page.** Type a question, or ask about highlighted words. Answers are kept on the sheet.
 - **Run AI on: Auto, This laptop or Cloud.** Auto lets the router decide per request from the connection (offline, slow or solid), how hard the task is, the browser's data saver and whether the on-device model is ready. Simple tasks stay on the laptop, and hard questions use the cloud when the connection allows. The sheet says where a request will run, why and what it will cost before you press the button, and "How it decides" lists recent decisions with their reasons.
+- **Data-saved counter.** Every answer made on the laptop adds what the same request would have cost in the cloud to a running total in the top bar. Connection details shows the full count, cloud data used included.
+- **Knows this laptop's speed.** A short speed check runs once in the background. On a slow laptop, Auto sends everyday tasks to the cloud while the connection is good (choose "This laptop" to keep them local). The model is also loaded into memory when the app opens, so the first request doesn't wait for it.
 - **Kept on your device.** Documents, highlights, notes, summaries and answers are stored in the browser (IndexedDB), work offline and remember the page you were on. Nothing is uploaded when you open a file.
 - **Connection details.** Opened from the status indicator in the top bar: sends the same question to Gemini Nano in Chrome and to Gemini in the cloud, showing where each answer ran and how long it took.
 
@@ -96,6 +98,9 @@ src/
   ai/routerConfig.ts      Router thresholds
   ai/difficulty.ts        Simple or hard: judging a question from its wording
   ai/routeLog.ts          Recent routing decisions
+  ai/deviceSpeed.ts       One-off speed check of the on-device model
+  lib/dataLedger.ts       Data saved and data used, kept on the device
+  lib/useOnDeviceStartup.ts  Model warm-up and the background speed check
   lib/network.ts          Live connection quality from the browser
   ai/prompts.ts           Prompts sized for Gemini Nano's on-device limits
   ai/jobs.ts              AI requests in progress (kept alive across page turns)
