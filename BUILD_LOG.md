@@ -9,7 +9,7 @@ What was built each day, what broke, and what we changed and why. Newest day fir
 - **The question box** is two lines tall, says "Type your question here…", and grows as you type.
 - **Ask now comes before Quiz** on the study sheet.
 - **Router v2.**
-  - **Speed check.** A short task (summarise one paragraph in a sentence) runs once on the laptop in the background, when no student request is using the model. The result is remembered. If it takes longer than 8 seconds, the laptop counts as slow, and Auto sends everyday tasks to the cloud while the connection is usable. "This laptop" still keeps everything local.
+  - **Speed check.** A short task (summarise one paragraph in a sentence) runs once on the laptop in the background, when no student request is using the model. The result is remembered. If it takes longer than 12 seconds, the laptop counts as slow, and Auto sends everyday tasks to the cloud while the connection is usable. "This laptop" still keeps everything local.
   - **Warm-up.** The on-device model is loaded into memory when the app opens.
   - **Data-saved counter.** Each on-device answer adds what the same request would have cost in the cloud (prompt and answer size plus overhead) to a running total in the top bar. Connection details shows data saved, cloud data used, and this laptop's speed, with buttons to check the speed again and to reset the counter. Speed checks and connection tests aren't counted.
   - The answer badges were already in place: every summary, answer and quiz records where it ran, the time taken and the data used.
@@ -25,9 +25,11 @@ What was built each day, what broke, and what we changed and why. Newest day fir
 - **The speed check uses the router,** pinned to the laptop, so all generation still goes through Firebase AI Logic. Only the warm-up touches Chrome's `LanguageModel` directly: it opens an idle session and generates nothing.
 - **Until the speed check has run, the laptop counts as fast,** so nothing spends data on a guess.
 - **Tests now pin the connection,** so they check the rules rather than Chrome's estimate. Speed, router and quiz checks all pass.
+- **Speed limit raised from 8 s to 12 s.** On the development laptop (Intel i7-10610U, CPU only), the real speed check took 7.3 s while a large download was running. That's just under the old limit, so a check taken at a busier moment could have pushed everyday work to the cloud. The brief says CPU-only laptops are the case to design for, so they should keep simple tasks local.
+- **Checked in Chrome with the real models:** a hard question ("Compare the XOR and XNOR gates step by step") went to the cloud (19 s, ~5 KB, during a large download), and the margin badges show where each answer ran.
 
 ### Still open
-- Router v1 and v2 still need a real-world check in Chrome: throttled network, Wi-Fi off, the real models, and this laptop's actual speed-check time. The 8-second threshold may need tuning.
+- Router v1 and v2: still to check with Wi-Fi off and with throttling, and the cloud answer time on a free connection (19 s was measured during a large download).
 - Offline question queue and Explain this are next.
 
 ## Wed 18 Nov 2026
