@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { TopBar } from './components/TopBar'
 import { useConnectivity } from './lib/useConnectivity'
 import { useOnDeviceStartup } from './lib/useOnDeviceStartup'
+import { useQueueFlusher } from './lib/useQueueFlusher'
 import { routes, useHashRoute } from './lib/useHashRoute'
 import { Diagnostics } from './screens/Diagnostics'
 import { Library } from './screens/Library'
@@ -13,6 +14,7 @@ export default function App() {
   const route = useHashRoute()
   const { online, deviceStatus, refresh } = useConnectivity()
   useOnDeviceStartup(deviceStatus)
+  useQueueFlusher()
   const [docTitle, setDocTitle] = useState<string | null>(null)
 
   useEffect(() => {

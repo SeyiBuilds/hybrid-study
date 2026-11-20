@@ -106,6 +106,41 @@ function useElapsed(since: number): number {
   return Math.max(0, now - since)
 }
 
+/** A request waiting in the offline queue, with a way to run it on this laptop now or cancel it. */
+export function Queued({
+  onDevice,
+  onCancel,
+}: {
+  /** Run it on this laptop instead of waiting; omitted when the laptop can't. */
+  onDevice?: () => void
+  onCancel: () => void
+}) {
+  return (
+    <div className="relative" role="status">
+      <span className="margin-note text-cloud">queued</span>
+      <div className="past-margin pr-5 sm:pr-8">
+        <p className="on-lines font-sans text-[0.88rem] text-ink">
+          Waiting for a connection. It goes to the cloud by itself when you&apos;re back online.
+        </p>
+        <p className="on-lines flex flex-wrap items-baseline gap-x-4">
+          {onDevice && (
+            <button
+              type="button"
+              onClick={onDevice}
+              className="font-sans text-[0.82rem] font-[620] text-ink underline decoration-margin decoration-2 underline-offset-4"
+            >
+              Answer on this laptop now
+            </button>
+          )}
+          <button type="button" onClick={onCancel} className="font-sans text-[0.8rem] font-[560] text-pencil hover:text-ink">
+            Cancel
+          </button>
+        </p>
+      </div>
+    </div>
+  )
+}
+
 /** Shown while the AI works: where it is running, a running clock, and a line being drawn. */
 export function Working({
   target,
@@ -161,8 +196,13 @@ const TASK_LABELS: Record<Task, string> = {
 }
 
 function autoHelp(network: NetworkState, deviceReady: boolean, deviceFast: boolean): string {
+  if (!deviceReady && network.quality === 'offline') {
+    return "You're offline and this laptop's AI isn't ready, so requests wait and go to the cloud when you're back online."
+  }
   if (!deviceReady) return "Using the cloud, because this laptop's AI is not ready."
-  if (network.quality === 'offline') return "You're offline, so everything runs on this laptop."
+  if (network.quality === 'offline') {
+    return "You're offline, so simple tasks run on this laptop and hard questions wait for the cloud."
+  }
   if (network.saveData) return "Your browser's data saver is on, so everything stays on this laptop."
   if (!network.usable) return 'The connection is very weak, so everything stays on this laptop.'
   if (!deviceFast) return 'This laptop is slow at AI, so requests use the cloud while the connection is good. Choose This laptop to save data.'
@@ -198,7 +238,7 @@ function RouterDetails({ deviceStatus, runOn, network }: { deviceStatus: OnDevic
           log.map((entry) => (
             <p key={entry.id} className="on-lines font-sans text-[0.8rem] text-pencil">
               <span className="font-[560] text-ink">
-                {TASK_LABELS[entry.task]}: {entry.target === 'on_device' ? 'this laptop' : 'cloud'}
+                {TASK_LABELS[entry.task]}: {entry.deferred ? 'queued' : entry.target === 'on_device' ? 'this laptop' : 'cloud'}
               </span>
               {' · '}
               {entry.reason}
@@ -223,22 +263,24 @@ export function RunOnSwitch({ deviceStatus }: { deviceStatus: OnDeviceStatus | n
   const deviceReady = deviceStatus === 'available'
   const unavailable: Partial<Record<RunOn, string>> = {}
   if (!deviceReady) unavailable.on_device = "This laptop's AI is not ready"
-  if (network.quality === 'offline') unavailable.in_cloud = 'You are offline'
 
   const decision = decide({ task: 'summarise', force: forcedTarget(runOn), onDeviceStatus: deviceStatus, network, deviceFast })
-  const problem = unavailable[runOn]
-    ? `${unavailable[runOn]}. Choose another option.`
-    : decision
-      ? null
-      : "You are offline, and this laptop's AI is not ready."
-  const target = problem ? null : (decision?.target ?? null)
-  const help = problem ?? (runOn === 'auto' ? autoHelp(network, deviceReady, deviceFast) : CHOICE_HELP[runOn])
+  const problem = unavailable[runOn] ? `${unavailable[runOn]}. Choose another option.` : null
+  // Where everyday requests go right now: this laptop, the cloud, or the offline queue.
+  const target = problem ? null : decision.deferred ? 'queued' : decision.target
+  const help =
+    problem ??
+    (runOn === 'auto'
+      ? autoHelp(network, deviceReady, deviceFast)
+      : runOn === 'in_cloud' && decision.deferred
+        ? "You're offline, so requests wait and go to the cloud when you're back online."
+        : CHOICE_HELP[runOn])
 
   return (
     <>
       <Row
-        note={target === 'on_device' ? 'device' : target === 'in_cloud' ? 'cloud' : 'none'}
-        noteClass={target === 'on_device' ? 'text-local' : target === 'in_cloud' ? 'text-cloud' : 'text-margin'}
+        note={target === 'on_device' ? 'device' : target === 'in_cloud' ? 'cloud' : target === 'queued' ? 'queued' : 'none'}
+        noteClass={target === 'on_device' ? 'text-local' : target === 'queued' || target === 'in_cloud' ? 'text-cloud' : 'text-margin'}
       >
         <h2 id="run-ai-on" className="on-lines eyebrow">
           Run AI on

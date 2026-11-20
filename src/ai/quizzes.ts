@@ -1,9 +1,20 @@
 /** Page quizzes: written through the router, checked, and saved on the device. */
 import type { Target } from './client'
-import { runAiJob } from './jobs'
+import { dismissJob, runAiJob } from './jobs'
 import { quizPrompt } from './prompts'
 import { parseQuiz } from './quiz'
-import { savePageQuiz, type PageQuiz } from '../lib/library'
+import { registerQueueRunner } from './queue'
+import { getContent, savePageQuiz, type PageQuiz } from '../lib/library'
+
+// A quiz that waited in the offline queue: rebuild it from the stored page and run it again.
+registerQueueRunner('quiz', async (entry) => {
+  const page = (await getContent(entry.documentId))?.pages[entry.page - 1]
+  if (!page) {
+    dismissJob(entry.jobKey)
+    return
+  }
+  await generateQuiz({ documentId: entry.documentId, title: entry.title, page: entry.page, pageText: page.text, force: entry.force })
+})
 
 export function quizJobKey(documentId: string, page: number): string {
   return `quiz:${documentId}:${page}`
@@ -28,6 +39,7 @@ export function generateQuiz(input: {
     force: input.force,
     meta: undefined,
     retries: 1,
+    queue: { kind: 'quiz', documentId: input.documentId, page: input.page, title: input.title },
     save: (result) => {
       const questions = parseQuiz(result.text)
       const now = Date.now()

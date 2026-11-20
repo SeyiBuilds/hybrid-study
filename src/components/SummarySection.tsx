@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react'
 import type { OnDeviceStatus } from '../ai/client'
-import { dismissJob, useJob } from '../ai/jobs'
+import { cancelQueued, dismissJob, useJob } from '../ai/jobs'
 import { buildSummaryPrompt, summarisePage, summaryJobKey } from '../ai/summaries'
 import { getPageSummary, savePageSummary, type PageSummary } from '../lib/library'
 import { hasUsableText, type PageText } from '../lib/pageText'
 import { useNetwork } from '../lib/network'
 import { forcedTarget, useRunOn } from '../lib/runOn'
-import { AiText, MarginMarks, Row, Working } from './sheet'
+import { AiText, MarginMarks, Queued, Row, Working } from './sheet'
 import { penField, pillButton, previewRun, quietButton, textButton } from './sheetStyles'
 
 function toEditable(text: string): string {
@@ -78,6 +78,20 @@ export function SummarySection({
       <Row>
         <p className="on-lines font-sans text-[0.88rem] text-pencil">There is no text on this page to summarise.</p>
       </Row>
+    )
+  } else if (job?.status === 'queued') {
+    body = (
+      <Queued
+        onDevice={
+          deviceStatus === 'available'
+            ? () => {
+                cancelQueued(key)
+                void summarisePage({ documentId, title, page: page.number, pageText: page.text, force: 'on_device' })
+              }
+            : undefined
+        }
+        onCancel={() => cancelQueued(key)}
+      />
     )
   } else if (job?.status === 'running') {
     body = <Working target={job.target} startedAt={job.startedAt} />

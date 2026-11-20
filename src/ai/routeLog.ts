@@ -8,6 +8,8 @@ export interface RouteLogEntry {
   task: Task
   target: Target
   reason: string
+  /** Waiting in the offline queue rather than running now. */
+  deferred?: boolean
 }
 
 const MAX_ENTRIES = 5

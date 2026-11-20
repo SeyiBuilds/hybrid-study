@@ -3,10 +3,11 @@
  * Every generation call in the app goes through `ask()`.
  *
  * Decision order:
- *   0. The student's own choice ("This laptop" or "Cloud") wins.
- *   1. No on-device model and offline: nothing can answer yet.
+ *   0. The student's own choice ("This laptop" or "Cloud") wins. Cloud while offline waits.
+ *   1. No on-device model and offline: queue it for the cloud.
  *   2. No on-device model: cloud.
- *   3. Offline: on-device (a slow answer beats no answer).
+ *   3. Offline: on-device (a slow answer beats no answer), except hard questions,
+ *      which are queued for the cloud and sent automatically when the connection returns.
  *   4. Browser data saver on: on-device.
  *   5. Hard question on a solid connection: cloud.
  *   6. Simple task, device fast enough: on-device.
@@ -26,6 +27,7 @@ import {
 } from './client'
 import { deviceIsFast } from './deviceSpeed'
 import type { Difficulty } from './difficulty'
+import { DeferredError } from './errors'
 import { logRoute } from './routeLog'
 import { recordUsage } from '../lib/dataLedger'
 import { readNetwork, type NetworkState } from '../lib/network'
@@ -50,6 +52,8 @@ export interface RouteDecision {
   cause: RouteCause
   /** Short human-readable reason, shown under "How it decides". */
   reason: string
+  /** The request can't run now; it waits in the offline queue for a connection. */
+  deferred?: boolean
 }
 
 export interface RouteInput {
@@ -63,14 +67,6 @@ export interface RouteInput {
   deviceFast?: boolean
 }
 
-/** Thrown when no model can answer right now (offline and no on-device model). */
-export class NoRouteError extends Error {
-  constructor() {
-    super('You are offline, and this browser cannot run AI on the device. Reconnect to use the cloud.')
-    this.name = 'NoRouteError'
-  }
-}
-
 /** Pure decision: also used to tell the student where a request will run before they press the button. */
 export function decide({
   task,
@@ -79,19 +75,28 @@ export function decide({
   onDeviceStatus,
   network,
   deviceFast = true,
-}: RouteInput): RouteDecision | null {
+}: RouteInput): RouteDecision {
+  const offline = network.quality === 'offline'
   if (force) {
+    if (force === 'in_cloud' && offline) {
+      return { target: 'in_cloud', cause: 'student-choice', reason: 'you chose the cloud: waiting for a connection', deferred: true }
+    }
     return {
       target: force,
       cause: 'student-choice',
       reason: task === 'speed-check' ? 'speed check' : force === 'on_device' ? 'you chose this laptop' : 'you chose the cloud',
     }
   }
-  const offline = network.quality === 'offline'
   if (onDeviceStatus !== 'available') {
-    return offline ? null : { target: 'in_cloud', cause: 'no-device-model', reason: 'on-device unavailable' }
+    return offline
+      ? { target: 'in_cloud', cause: 'no-device-model', reason: 'offline + on-device unavailable: queued', deferred: true }
+      : { target: 'in_cloud', cause: 'no-device-model', reason: 'on-device unavailable' }
   }
-  if (offline) return { target: 'on_device', cause: 'offline', reason: 'offline' }
+  if (offline) {
+    return difficulty === 'hard'
+      ? { target: 'in_cloud', cause: 'hard-task', reason: 'hard question while offline: queued for the cloud', deferred: true }
+      : { target: 'on_device', cause: 'offline', reason: 'offline' }
+  }
   if (network.saveData) return { target: 'on_device', cause: 'data-saver', reason: 'data saver on' }
   if (difficulty === 'hard' && network.quality === 'solid') {
     return { target: 'in_cloud', cause: 'hard-task', reason: 'hard question + good connection' }
@@ -130,8 +135,8 @@ export async function ask(
     network: readNetwork(),
     deviceFast: deviceIsFast(),
   })
-  if (!decision) throw new NoRouteError()
-  logRoute({ task: options.task, target: decision.target, reason: decision.reason })
+  logRoute({ task: options.task, target: decision.target, reason: decision.reason, deferred: decision.deferred })
+  if (decision.deferred) throw new DeferredError(decision.reason)
   options.onDecision?.(decision)
   const text = typeof prompt === 'function' ? prompt(decision) : prompt
   const result = await generateStream(text, decision.target, options.onText, options.format)

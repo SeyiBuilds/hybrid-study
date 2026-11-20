@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import type { OnDeviceStatus } from '../ai/client'
-import { askAboutPage, askJobPrefix, buildAskPrompt, type AskMeta } from '../ai/asks'
+import { askAboutPage, askIdFromKey, askJobPrefix, buildAskPrompt, type AskMeta } from '../ai/asks'
 import { classifyQuestion } from '../ai/difficulty'
-import { dismissJob, useJobs } from '../ai/jobs'
+import { cancelQueued, dismissJob, useJobs } from '../ai/jobs'
 import { deleteAnswer, listAnswers, type PageAnswer } from '../lib/library'
 import { hasUsableText, type PageText } from '../lib/pageText'
 import { useNetwork } from '../lib/network'
 import { forcedTarget, useRunOn } from '../lib/runOn'
-import { AiText, MarginMarks, Row, Working } from './sheet'
+import { AiText, MarginMarks, Queued, Row, Working } from './sheet'
 import { penField, pillButton, previewRun, quietButton } from './sheetStyles'
 
 function Question({ question, quote }: { question: string; quote?: string }) {
@@ -162,7 +162,25 @@ export function AskSection({
       {pending.map((job) => (
         <div key={job.key} style={{ marginTop: 'var(--line)' }}>
           <Question question={job.meta.question} quote={job.meta.quote} />
-          {job.status === 'running' ? (
+          {job.status === 'queued' ? (
+            <Queued
+              onDevice={
+                deviceStatus === 'available'
+                  ? () => {
+                      cancelQueued(job.key)
+                      void askAboutPage({
+                        ...input,
+                        question: job.meta.question,
+                        quote: job.meta.quote,
+                        id: askIdFromKey(job.key),
+                        force: 'on_device',
+                      })
+                    }
+                  : undefined
+              }
+              onCancel={() => cancelQueued(job.key)}
+            />
+          ) : job.status === 'running' ? (
             <Working target={job.target} startedAt={job.startedAt} />
           ) : (
             <>

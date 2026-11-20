@@ -1,9 +1,10 @@
 /** Questions about a page: run through the router, answers saved on the device. */
 import type { Target } from './client'
 import { classifyQuestion } from './difficulty'
-import { runAiJob } from './jobs'
+import { dismissJob, runAiJob } from './jobs'
 import { askPrompt, documentContext } from './prompts'
-import { saveAnswer, type PageAnswer } from '../lib/library'
+import { registerQueueRunner } from './queue'
+import { getContent, saveAnswer, type PageAnswer } from '../lib/library'
 import type { PageText } from '../lib/pageText'
 
 export interface AskMeta {
@@ -22,6 +23,9 @@ export interface AskInput {
   quote?: string
 }
 
+/** The question students get when they press Explain on highlighted words. */
+export const EXPLAIN_QUESTION = 'Explain this in simple words.'
+
 export function askJobPrefix(documentId: string, page: number): string {
   return `ask:${documentId}:${page}:`
 }
@@ -38,8 +42,8 @@ export function buildAskPrompt(input: AskInput, target: Target): string {
   })
 }
 
-export function askAboutPage(input: AskInput & { force?: Target }): Promise<void> {
-  const id = crypto.randomUUID()
+export function askAboutPage(input: AskInput & { force?: Target; id?: string }): Promise<void> {
+  const id = input.id ?? crypto.randomUUID()
   return runAiJob<PageAnswer, AskMeta>({
     key: `${askJobPrefix(input.documentId, input.page)}${id}`,
     prompt: (decision) => buildAskPrompt(input, decision.target),
@@ -47,6 +51,14 @@ export function askAboutPage(input: AskInput & { force?: Target }): Promise<void
     difficulty: classifyQuestion(input.question).difficulty,
     force: input.force,
     meta: { question: input.question, quote: input.quote },
+    queue: {
+      kind: 'ask',
+      documentId: input.documentId,
+      page: input.page,
+      title: input.title,
+      question: input.question,
+      quote: input.quote,
+    },
     save: (result) =>
       saveAnswer({
         id,
@@ -62,3 +74,29 @@ export function askAboutPage(input: AskInput & { force?: Target }): Promise<void
       }),
   })
 }
+
+/** The id of a question, from its job key. */
+export function askIdFromKey(key: string): string {
+  return key.slice(key.lastIndexOf(':') + 1)
+}
+
+// A question that waited in the offline queue: rebuild it from the stored document and ask again.
+registerQueueRunner('ask', async (entry) => {
+  const content = await getContent(entry.documentId)
+  const page = content?.pages[entry.page - 1]
+  if (!content || !page || !entry.question) {
+    dismissJob(entry.jobKey)
+    return
+  }
+  await askAboutPage({
+    id: askIdFromKey(entry.jobKey),
+    documentId: entry.documentId,
+    title: entry.title,
+    page: entry.page,
+    pageText: page.text,
+    pages: content.pages,
+    question: entry.question,
+    quote: entry.quote,
+    force: entry.force,
+  })
+})

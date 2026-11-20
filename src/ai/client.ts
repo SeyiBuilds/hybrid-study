@@ -245,7 +245,7 @@ export function generateStream(
 /** Turns SDK errors into a message a student (or Seyi during setup) can act on. */
 export function describeError(error: unknown): string {
   if (error instanceof OnDeviceNotReadyError) return error.message
-  if (error instanceof Error && error.name === 'NoRouteError') return error.message
+  if (error instanceof Error && error.name === 'DeferredError') return error.message
 
   if (error instanceof AIError) {
     const message = error.message

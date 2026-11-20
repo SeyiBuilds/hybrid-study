@@ -14,6 +14,7 @@ export function MarkToolbar({
   target,
   onHighlight,
   onNote,
+  onExplain,
   onAsk,
   onRemove,
   onClose,
@@ -21,6 +22,8 @@ export function MarkToolbar({
   target: ToolbarTarget
   onHighlight: (color: HighlightColor) => void
   onNote: () => void
+  /** Ask straight away for a plain-words breakdown of the words. */
+  onExplain: () => void
   onAsk: () => void
   onRemove: () => void
   onClose: () => void
@@ -89,6 +92,9 @@ export function MarkToolbar({
       <span className="mx-0.5 h-5 w-px bg-sheet/25" aria-hidden />
       <button type="button" className={textButton} onClick={onNote}>
         {target.kind === 'highlight' && target.highlight.note ? 'Edit note' : 'Add note'}
+      </button>
+      <button type="button" className={textButton} onClick={onExplain}>
+        Explain
       </button>
       <button type="button" className={textButton} onClick={onAsk}>
         Ask

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { askAboutPage, EXPLAIN_QUESTION } from '../ai/asks'
 import type { OnDeviceStatus } from '../ai/client'
 import { AskSection } from '../components/AskSection'
 import { MarkToolbar, type ToolbarTarget } from '../components/MarkToolbar'
@@ -31,6 +32,7 @@ import {
   type PDFDocumentProxy,
 } from '../lib/pdf'
 import { EXTRACT_VERSION, type TextBlock } from '../lib/pageText'
+import { forcedTarget, useRunOn } from '../lib/runOn'
 import { navigate, routes } from '../lib/useHashRoute'
 
 type LoadState =
@@ -277,6 +279,7 @@ function ReaderView({
   const current = Math.min(Math.max(1, requestedPage ?? summary.lastPage ?? 1), total)
   const page = content.pages[current - 1]
   const [mobileView, setMobileView] = useState<'page' | 'study'>('page')
+  const runOn = useRunOn()
   const [highlights, setHighlights] = useState<{ page: number; list: Highlight[] }>({ page: 0, list: [] })
   const [selection, setSelection] = useState<PageSelection | null>(null)
   const [toolbar, setToolbar] = useState<ToolbarTarget | null>(null)
@@ -395,6 +398,28 @@ function ReaderView({
     setAskPrefill({ quote, nonce: Date.now() })
   }
 
+  // Explain: ask straight away for a plain-words breakdown of the marked words.
+  const onToolbarExplain = () => {
+    const quote = toolbar?.kind === 'highlight' ? toolbar.highlight.text : selection?.text
+    setToolbar(null)
+    if (!quote) return
+    window.getSelection()?.removeAllRanges()
+    setMobileView('study')
+    void askAboutPage({
+      documentId: summary.id,
+      title: summary.title,
+      page: current,
+      pageText: page.text,
+      pages: content.pages,
+      question: EXPLAIN_QUESTION,
+      quote,
+      force: forcedTarget(runOn),
+    })
+    window.requestAnimationFrame(() =>
+      document.querySelector('section[aria-label="Ask about this page"]')?.scrollIntoView({ block: 'start', behavior: 'smooth' }),
+    )
+  }
+
   const onToolbarRemove = () => {
     if (toolbar?.kind === 'highlight') removeHighlight(toolbar.highlight.id)
     setToolbar(null)
@@ -502,6 +527,7 @@ function ReaderView({
           target={toolbar}
           onHighlight={onToolbarHighlight}
           onNote={onToolbarNote}
+          onExplain={onToolbarExplain}
           onAsk={onToolbarAsk}
           onRemove={onToolbarRemove}
           onClose={closeToolbar}

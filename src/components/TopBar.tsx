@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import type { OnDeviceStatus } from '../ai/client'
+import { useQueue } from '../ai/queue'
 import { useDataLedger } from '../lib/dataLedger'
 import { dataSize } from '../lib/format'
 import { routes } from '../lib/useHashRoute'
@@ -58,6 +59,22 @@ export function StatusPill({ online, deviceStatus }: { online: boolean; deviceSt
   )
 }
 
+/** How many requests are waiting in the offline queue for a connection. */
+function QueueCount() {
+  const queue = useQueue()
+  if (queue.length === 0) return null
+  return (
+    <span
+      title="These go to the cloud by themselves when you're back online"
+      className="figures flex shrink-0 items-baseline gap-1.5 rounded-full px-3 py-1.5 text-[0.8rem] text-pencil"
+      role="status"
+    >
+      <span className="font-[680] text-cloud">{queue.length}</span>
+      <span>waiting for a connection</span>
+    </span>
+  )
+}
+
 /** The running total of data saved by answering on this laptop instead of the cloud. */
 function DataSaved() {
   const ledger = useDataLedger()
@@ -91,6 +108,7 @@ export function TopBar({
           <span className="display hidden text-[1.15rem] sm:inline">Hybrid Study</span>
         </a>
         <div className="flex min-w-0 flex-1 items-center gap-3">{children}</div>
+        <QueueCount />
         <DataSaved />
         <StatusPill online={online} deviceStatus={deviceStatus} />
       </div>

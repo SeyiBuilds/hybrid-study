@@ -1,8 +1,19 @@
 /** Page summaries: run through the router and saved on the device. */
 import type { Target } from './client'
-import { runAiJob } from './jobs'
+import { dismissJob, runAiJob } from './jobs'
 import { summarisePrompt } from './prompts'
-import { savePageSummary, type PageSummary } from '../lib/library'
+import { registerQueueRunner } from './queue'
+import { getContent, savePageSummary, type PageSummary } from '../lib/library'
+
+// A summary that waited in the offline queue: rebuild it from the stored page and run it again.
+registerQueueRunner('summary', async (entry) => {
+  const page = (await getContent(entry.documentId))?.pages[entry.page - 1]
+  if (!page) {
+    dismissJob(entry.jobKey)
+    return
+  }
+  await summarisePage({ documentId: entry.documentId, title: entry.title, page: entry.page, pageText: page.text, force: entry.force })
+})
 
 export function summaryJobKey(documentId: string, page: number): string {
   return `summary:${documentId}:${page}`
@@ -25,6 +36,7 @@ export function summarisePage(input: {
     task: 'summarise',
     force: input.force,
     meta: undefined,
+    queue: { kind: 'summary', documentId: input.documentId, page: input.page, title: input.title },
     save: (result) =>
       savePageSummary({
         documentId: input.documentId,

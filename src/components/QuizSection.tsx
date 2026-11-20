@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import type { OnDeviceStatus } from '../ai/client'
-import { useJob } from '../ai/jobs'
+import { cancelQueued, useJob } from '../ai/jobs'
 import { hasEnoughForQuiz, type QuizQuestion } from '../ai/quiz'
 import { buildQuizPrompt, generateQuiz, quizJobKey } from '../ai/quizzes'
 import { dataSize, seconds } from '../lib/format'
@@ -8,7 +8,7 @@ import { getPageQuiz, savePageQuiz, type PageQuiz } from '../lib/library'
 import type { PageText } from '../lib/pageText'
 import { useNetwork } from '../lib/network'
 import { forcedTarget, useRunOn } from '../lib/runOn'
-import { Row, Working } from './sheet'
+import { Queued, Row, Working } from './sheet'
 import { pillButton, previewRun, quietButton, textButton } from './sheetStyles'
 
 const LETTERS = ['A', 'B', 'C', 'D']
@@ -285,6 +285,20 @@ export function QuizSection({
       <Row>
         <p className="on-lines font-sans text-[0.88rem] text-pencil">There is not enough text on this page for a quiz.</p>
       </Row>
+    )
+  } else if (job?.status === 'queued') {
+    body = (
+      <Queued
+        onDevice={
+          deviceStatus === 'available'
+            ? () => {
+                cancelQueued(quizJobKey(documentId, page.number))
+                void generateQuiz({ documentId, title, page: page.number, pageText: page.text, force: 'on_device' })
+              }
+            : undefined
+        }
+        onCancel={() => cancelQueued(quizJobKey(documentId, page.number))}
+      />
     )
   } else if (job?.status === 'running') {
     body = (

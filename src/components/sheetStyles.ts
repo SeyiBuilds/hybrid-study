@@ -59,14 +59,23 @@ export function previewRun({
     network,
     deviceFast: deviceIsFast(),
   })
-  if (!decision) return { text: 'You are offline, and this browser cannot run AI on the device.', blocked: true }
   if (decision.target === 'on_device') {
     if (deviceStatus !== 'available') {
       return { text: "This laptop's AI is not ready. Choose Auto or Cloud above.", blocked: true }
     }
     return { text: ON_DEVICE_PREVIEW[decision.cause] ?? 'Runs on this laptop and uses no data.', blocked: false }
   }
-  if (network.quality === 'offline') return { text: 'You are offline. Choose Auto or This laptop above.', blocked: true }
+  if (decision.deferred) {
+    return {
+      text:
+        decision.cause === 'hard-task'
+          ? "Hard question and you're offline, so it will wait and go to the cloud when you're back online."
+          : decision.cause === 'no-device-model'
+            ? "You're offline and this laptop's AI isn't ready, so this will wait for a connection."
+            : "You're offline, so this will wait and go to the cloud when you're back online.",
+      blocked: false,
+    }
+  }
   const text = typeof prompt === 'function' ? prompt(decision.target) : prompt
   const size = dataSize(estimateCloudBytesFor(text, expectedAnswerChars), { approximate: false })
   return {

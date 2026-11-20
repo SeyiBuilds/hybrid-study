@@ -1,14 +1,17 @@
 /**
  * AI requests in progress. A job keeps running when the student turns the page, and the
- * answer is shown whole once it is ready (not typed out word by word).
+ * answer is shown whole once it is ready (not typed out word by word). A job that can't
+ * run yet waits in the offline queue and is shown as queued, even after a reload.
  */
 import { useSyncExternalStore } from 'react'
 import { describeError, type OutputFormat, type Target } from './client'
-import { BadOutputError } from './errors'
+import { BadOutputError, DeferredError } from './errors'
 import type { Difficulty } from './difficulty'
+import { dequeue, enqueue, queuedEntries, type QueueEntry } from './queue'
 import { ask, type AskResult, type RouteDecision, type Task } from './router'
 
 export type Job<R, M = undefined> =
+  | { status: 'queued'; key: string; reason: string; queuedAt: number; meta: M }
   | { status: 'running'; key: string; target: Target | null; startedAt: number; meta: M }
   | { status: 'done'; key: string; result: R; meta: M }
   | { status: 'error'; key: string; message: string; meta: M }
@@ -17,6 +20,11 @@ const jobs = new Map<string, Job<unknown, unknown>>()
 const listeners = new Set<() => void>()
 let version = 0
 const prefixCache = new Map<string, { version: number; list: Job<unknown, unknown>[] }>()
+
+// Anything still waiting from an earlier visit shows up as queued straight away.
+for (const entry of queuedEntries()) {
+  jobs.set(entry.jobKey, { status: 'queued', key: entry.jobKey, reason: entry.reason, queuedAt: entry.queuedAt, meta: entry.meta })
+}
 
 function emit() {
   version += 1
@@ -35,6 +43,12 @@ export function hasRunningJobs(): boolean {
 
 export function dismissJob(key: string) {
   if (jobs.delete(key)) emit()
+}
+
+/** Takes a waiting request out of the offline queue. */
+export function cancelQueued(key: string) {
+  dequeue(key)
+  dismissJob(key)
 }
 
 function subscribe(listener: () => void) {
@@ -60,7 +74,8 @@ export function useJobs<R, M = undefined>(prefix: string): Job<R, M>[] {
 /**
  * Runs one AI request through the router, then saves the result with `save`.
  * If the output is unusable (`BadOutputError`), it is requested again up to `retries` times;
- * the time and data reported cover every attempt.
+ * the time and data reported cover every attempt. If the router says it has to wait for a
+ * connection and `queue` describes how to run it again, it goes into the offline queue.
  */
 export async function runAiJob<R, M>({
   key,
@@ -71,6 +86,7 @@ export async function runAiJob<R, M>({
   force,
   meta,
   retries = 0,
+  queue,
   save,
 }: {
   key: string
@@ -81,6 +97,7 @@ export async function runAiJob<R, M>({
   force?: Target
   meta: M
   retries?: number
+  queue?: Omit<QueueEntry, 'jobKey' | 'reason' | 'queuedAt' | 'meta' | 'force'>
   save: (result: AskResult) => Promise<R>
 }): Promise<void> {
   if (jobs.get(key)?.status === 'running') return
@@ -113,6 +130,12 @@ export async function runAiJob<R, M>({
       }
     }
   } catch (error) {
+    if (error instanceof DeferredError && queue) {
+      const queuedAt = Date.now()
+      enqueue({ ...queue, jobKey: key, force, meta, reason: error.reason, queuedAt })
+      set({ status: 'queued', key, reason: error.reason, queuedAt, meta })
+      return
+    }
     set({ status: 'error', key, message: describeError(error), meta })
   }
 }
