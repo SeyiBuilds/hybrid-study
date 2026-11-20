@@ -2,6 +2,37 @@
 
 What was built each day, what broke, and what we changed and why. Newest day first.
 
+## Fri 20 Nov 2026
+
+### Built
+- **Offline queue.**
+  - A hard question asked offline is marked "Queued" on the study sheet. The moment the browser comes back online, it goes to the cloud on its own and the answer appears in place.
+  - Each queued item offers "Answer on this laptop now" (when the on-device model is ready) and "Cancel".
+  - Summaries, quizzes and questions also queue when they can't run offline: when the on-device model isn't available, or when the student chose Cloud.
+  - The queue is saved on the device. It survives a reload or closing the tab, and is sent on the next visit if the connection is back.
+  - The top bar shows how many items are waiting.
+- **Explain this.** A new "Explain" button on the selection toolbar asks for a plain-words breakdown of the highlighted words, routed like any other question.
+
+### What broke
+- The test for Chrome's own offline mode failed at first because the test's simulated `navigator.onLine` was still masking the real one. A test bug, not an app bug.
+
+### What we changed and why
+- **Offline, hard questions now queue for the cloud** instead of running on the laptop. That's what the brief's demo calls for: ask a hard question offline, it queues, the answer arrives when Wi-Fi returns. Simple tasks offline still run on the laptop, and "Answer on this laptop now" covers anyone who would rather not wait.
+- **The router defers instead of failing.** A request that can't run now is marked deferred. The job store puts it in the queue with enough detail to rebuild it later from the stored document. No prompt text and no student data leave the device until it's sent.
+- **Cloud is no longer greyed out offline.** Choosing Cloud while offline now means "wait for the connection".
+- **Tested in headless Chrome:**
+  - queuing, the reload, sending on reconnect
+  - Answer now and Cancel
+  - queued summaries and quizzes
+  - Explain
+  - a full round trip in Chrome's own offline mode
+  
+  The router, quiz and speed suites still pass.
+
+### Still open
+- Seyi to try it for real: Wi-Fi off, ask a hard question, Wi-Fi back on.
+- Firestore and Remote Config are next.
+
 ## Thu 19 Nov 2026
 
 ### Built
