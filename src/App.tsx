@@ -27,7 +27,7 @@ export default function App() {
 
   return (
     <>
-      <TopBar online={online} deviceStatus={deviceStatus}>
+      <TopBar deviceStatus={deviceStatus}>
         {route.name !== 'library' && (
           <>
             <a href={routes.library} className="shrink-0 text-[0.85rem] font-[600] text-pencil hover:text-ink">

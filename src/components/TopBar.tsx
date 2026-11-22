@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import type { OnDeviceStatus } from '../ai/client'
 import { useQueue } from '../ai/queue'
 import { useDataLedger } from '../lib/dataLedger'
+import { useNetwork } from '../lib/network'
 import { dataSize } from '../lib/format'
 import { routes } from '../lib/useHashRoute'
 
@@ -38,8 +39,10 @@ const toneColor = {
   pending: 'bg-pencil/50',
 }
 
-export function StatusPill({ online, deviceStatus }: { online: boolean; deviceStatus: OnDeviceStatus | null }) {
+export function StatusPill({ deviceStatus }: { deviceStatus: OnDeviceStatus | null }) {
   const ai = aiLabel(deviceStatus)
+  const network = useNetwork()
+  const online = network.quality !== 'offline'
   return (
     <a
       href={routes.diagnostics}
@@ -48,7 +51,9 @@ export function StatusPill({ online, deviceStatus }: { online: boolean; deviceSt
     >
       <span className="flex items-center gap-1.5">
         <span className={`h-1.5 w-1.5 rounded-full ${online ? 'bg-ink/60' : 'bg-margin'}`} aria-hidden />
-        <span className={online ? '' : 'text-margin'}>{online ? 'Online' : 'Offline'}</span>
+        <span className={online ? '' : 'text-margin'} title={network.noInternet ? 'Connected, but the internet is not getting through' : undefined}>
+          {online ? 'Online' : network.noInternet ? 'No internet' : 'Offline'}
+        </span>
       </span>
       <span className="hidden h-3 w-px bg-rule sm:block" aria-hidden />
       <span className="hidden items-center gap-1.5 sm:flex">
@@ -91,15 +96,7 @@ function DataSaved() {
   )
 }
 
-export function TopBar({
-  online,
-  deviceStatus,
-  children,
-}: {
-  online: boolean
-  deviceStatus: OnDeviceStatus | null
-  children?: ReactNode
-}) {
+export function TopBar({ deviceStatus, children }: { deviceStatus: OnDeviceStatus | null; children?: ReactNode }) {
   return (
     <header className="sticky top-0 z-20 border-b border-rule bg-desk/90 backdrop-blur supports-[backdrop-filter]:bg-desk/75">
       <div className="mx-auto flex h-14 max-w-[1600px] items-center gap-4 px-4 sm:px-6">
@@ -110,7 +107,7 @@ export function TopBar({
         <div className="flex min-w-0 flex-1 items-center gap-3">{children}</div>
         <QueueCount />
         <DataSaved />
-        <StatusPill online={online} deviceStatus={deviceStatus} />
+        <StatusPill deviceStatus={deviceStatus} />
       </div>
     </header>
   )

@@ -16,6 +16,10 @@ export const ROUTER_DEFAULTS = {
    * so a check taken at a busy moment doesn't push everyday work to the cloud.
    */
   deviceFastMaxMs: 12000,
+  /** A cloud request that hasn't started answering by now is treated as a dead connection. */
+  cloudTimeoutMs: 45000,
+  /** While the cloud is unreachable, check this often whether the internet is back. */
+  reachabilityProbeMs: 15000,
 }
 
 export type RouterConfig = typeof ROUTER_DEFAULTS

@@ -20,6 +20,7 @@ import {
   estimateCloudBytes,
   generateStream,
   getOnDeviceStatus,
+  isNetworkFailure,
   type GenerateResult,
   type OnDeviceStatus,
   type OutputFormat,
@@ -30,7 +31,7 @@ import type { Difficulty } from './difficulty'
 import { DeferredError } from './errors'
 import { logRoute } from './routeLog'
 import { recordUsage } from '../lib/dataLedger'
-import { readNetwork, type NetworkState } from '../lib/network'
+import { markCloudReachable, markCloudUnreachable, readNetwork, type NetworkState } from '../lib/network'
 
 export type Task = 'summarise' | 'ask' | 'quiz' | 'connection-test' | 'speed-check'
 
@@ -127,19 +128,40 @@ export async function ask(
     onDecision?: (decision: RouteDecision) => void
   },
 ): Promise<AskResult> {
-  const decision = decide({
-    task: options.task,
-    difficulty: options.difficulty,
-    force: options.force,
-    onDeviceStatus: await getOnDeviceStatus(),
-    network: readNetwork(),
-    deviceFast: deviceIsFast(),
-  })
+  const route = async () =>
+    decide({
+      task: options.task,
+      difficulty: options.difficulty,
+      force: options.force,
+      onDeviceStatus: await getOnDeviceStatus(),
+      network: readNetwork(),
+      deviceFast: deviceIsFast(),
+    })
+  const promptFor = (chosen: RouteDecision) => (typeof prompt === 'function' ? prompt(chosen) : prompt)
+
+  let decision = await route()
   logRoute({ task: options.task, target: decision.target, reason: decision.reason, deferred: decision.deferred })
   if (decision.deferred) throw new DeferredError(decision.reason)
   options.onDecision?.(decision)
-  const text = typeof prompt === 'function' ? prompt(decision) : prompt
-  const result = await generateStream(text, decision.target, options.onText, options.format)
+  let text = promptFor(decision)
+  let result: GenerateResult
+  try {
+    result = await generateStream(text, decision.target, options.onText, options.format)
+  } catch (error) {
+    // The browser said online, but the cloud couldn't be reached. Treat it as offline and
+    // decide again: the laptop answers what it can; the rest waits in the offline queue.
+    if (decision.target !== 'in_cloud' || !isNetworkFailure(error)) throw error
+    markCloudUnreachable()
+    const retry = await route()
+    const reason = `cloud unreachable: ${retry.reason}`
+    logRoute({ task: options.task, target: retry.target, reason, deferred: retry.deferred })
+    if (retry.deferred || retry.target !== 'on_device') throw new DeferredError(reason)
+    decision = { ...retry, reason }
+    options.onDecision?.(decision)
+    text = promptFor(decision)
+    result = await generateStream(text, 'on_device', options.onText, options.format)
+  }
+  if (result.source === 'in_cloud') markCloudReachable()
   if (!SYSTEM_TASKS.includes(options.task)) {
     const onDevice = result.source === 'on_device'
     recordUsage({

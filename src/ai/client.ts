@@ -15,6 +15,7 @@ import {
   type LanguageModelCreateOptions,
 } from 'firebase/ai'
 import { quizSchema } from './quiz'
+import { ROUTER_DEFAULTS } from './routerConfig'
 import { app } from '../firebase'
 
 export type Target = 'on_device' | 'in_cloud'
@@ -44,10 +45,14 @@ const onDeviceModel = getGenerativeModel(ai, {
   onDeviceParams: { createOptions: onDeviceCreateOptions },
 })
 
-const cloudModel = getGenerativeModel(ai, {
-  mode: InferenceMode.ONLY_IN_CLOUD,
-  inCloudParams: { model: CLOUD_MODEL },
-})
+/** Fail a dead connection quickly instead of waiting for the SDK's 3-minute default. */
+const cloudRequestOptions = { timeout: ROUTER_DEFAULTS.cloudTimeoutMs }
+
+const cloudModel = getGenerativeModel(
+  ai,
+  { mode: InferenceMode.ONLY_IN_CLOUD, inCloudParams: { model: CLOUD_MODEL } },
+  cloudRequestOptions,
+)
 
 const quizOnDeviceModel = getGenerativeModel(ai, {
   mode: InferenceMode.ONLY_ON_DEVICE,
@@ -57,13 +62,17 @@ const quizOnDeviceModel = getGenerativeModel(ai, {
   },
 })
 
-const quizCloudModel = getGenerativeModel(ai, {
-  mode: InferenceMode.ONLY_IN_CLOUD,
-  inCloudParams: {
-    model: CLOUD_MODEL,
-    generationConfig: { responseMimeType: 'application/json', responseSchema: quizSchema },
+const quizCloudModel = getGenerativeModel(
+  ai,
+  {
+    mode: InferenceMode.ONLY_IN_CLOUD,
+    inCloudParams: {
+      model: CLOUD_MODEL,
+      generationConfig: { responseMimeType: 'application/json', responseSchema: quizSchema },
+    },
   },
-})
+  cloudRequestOptions,
+)
 
 const models = {
   text: { on_device: onDeviceModel, in_cloud: cloudModel },
@@ -243,9 +252,22 @@ export function generateStream(
 }
 
 /** Turns SDK errors into a message a student (or Seyi during setup) can act on. */
+/**
+ * True when a cloud request failed because the internet couldn't be reached (no route,
+ * no DNS, or no answer before the timeout) rather than because the server said no.
+ * The SDK reports these without an HTTP status.
+ */
+export function isNetworkFailure(error: unknown): boolean {
+  if (!(error instanceof Error)) return false
+  if (error.name === 'AbortError') return /timeout/i.test(error.message)
+  if (/\[\d{3}\b/.test(error.message)) return false
+  return /failed to fetch|networkerror|load failed|network|err_internet|err_name_not_resolved|timeout/i.test(error.message)
+}
+
 export function describeError(error: unknown): string {
   if (error instanceof OnDeviceNotReadyError) return error.message
   if (error instanceof Error && error.name === 'DeferredError') return error.message
+  if (isNetworkFailure(error)) return "Couldn't reach the cloud. The internet doesn't seem to be getting through."
 
   if (error instanceof AIError) {
     const message = error.message
