@@ -10,8 +10,8 @@ Built for the [#BuildHybridAI 2026 hackathon](https://firebasehybridaihackathon.
 
 - **PDF reader.** Open or drop a PDF and read it page by page. Running headers, footers and page numbers are stripped from the text the AI reads, and paragraphs, headings, lists and contents entries are rebuilt. Pages that are scanned images are flagged.
 - **Highlight on the page.** Select words on the PDF itself and mark them with a yellow, green or pink highlighter. Click a highlight to recolour it, add a note, ask about it or remove it.
-- **A study sheet for every page.** A ruled sheet beside the page holds the summary, your questions, your own notes (written in "blue biro") and a list of your highlights with their notes. Summaries can be edited into your own words.
-- **Summarise a page.** 3 to 5 bullets, shown whole when ready. Each answer records where it ran, how long it took and roughly how much data it used, in the margin.
+- **A study sheet for every page.** A ruled sheet beside the page with four tabs: Summary, Ask, Quiz and Notes (your own notes in "blue biro" and the page's highlights with their notes). Summaries can be edited into your own words. A tab shows a dot while something behind it is working or waiting.
+- **Summarise a page.** 3 to 5 bullets, shown whole when ready. Every answer carries a badge with where it ran, how long it took and roughly how much data it used, for example "This laptop · 6.1 s · no data used".
 - **Quiz me.** Five multiple-choice questions from the page. Choose your answers, then the sheet marks them like a script: ticks and crosses in the margin, a circled score and a short explanation for each question. Quizzes and scores are saved on the device.
 - **Ask about this page.** Type a question, or ask about highlighted words. Answers are kept on the sheet.
 - **Explain this.** Select words on the page and press Explain for a plain-words breakdown.
@@ -119,7 +119,9 @@ src/
   components/QuizSection.tsx     Quiz questions, marking and score
   components/AskSection.tsx      Ask about this page
   components/NotesSection.tsx    My notes and the page's highlights
-  components/sheet.tsx    Ruled-sheet rows, margin marks, waiting state, Run AI on switch
+  components/sheet.tsx    Ruled-sheet rows, answer badges, waiting state, Run AI on switch
+  components/SheetTabs.tsx  Summary, Ask, Quiz and Notes tabs on the study sheet
+  lib/sheetTab.ts         The open tab, and what is working or queued behind each one
   lib/pageText.ts         Header/footer removal and paragraph, heading and list rebuilding
   lib/highlights.ts       Turning a selection into page-relative highlight rectangles
   lib/runOn.ts            The student's Run AI on choice
