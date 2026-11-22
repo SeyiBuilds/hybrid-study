@@ -181,6 +181,12 @@ body {
   font-feature-settings: 'tnum' 0;
 }
 
+/* Quiet scrollbars that match the paper. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-rule) transparent;
+}
+
 ::selection {
   background-color: var(--color-highlight);
   color: var(--color-ink);

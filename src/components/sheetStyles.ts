@@ -20,9 +20,13 @@ export const quietButton = 'font-sans text-[0.8rem] font-[560] text-pencil hover
 export const penField =
   'reading on-lines block w-full cursor-text resize-none rounded-[4px] border-[1.5px] border-rule bg-desk/45 px-2.5 py-0 text-pen outline-none transition-colors [field-sizing:content] placeholder:text-pencil hover:border-pencil/70 focus:border-ink focus:bg-sheet focus-visible:outline-none'
 
+/** Where a request goes, shown as a coloured dot. */
+export type DotKind = 'device' | 'cloud' | 'queued' | 'blocked' | 'idle'
+
 export interface RunPreview {
   text: string
   blocked: boolean
+  kind: DotKind
 }
 
 const ON_DEVICE_PREVIEW: Partial<Record<RouteCause, string>> = {
@@ -61,9 +65,9 @@ export function previewRun({
   })
   if (decision.target === 'on_device') {
     if (deviceStatus !== 'available') {
-      return { text: "This laptop's AI is not ready. Choose Auto or Cloud above.", blocked: true }
+      return { text: "This laptop's AI is not ready. Choose Auto or Cloud above.", blocked: true, kind: 'blocked' }
     }
-    return { text: ON_DEVICE_PREVIEW[decision.cause] ?? 'Runs on this laptop and uses no data.', blocked: false }
+    return { text: ON_DEVICE_PREVIEW[decision.cause] ?? 'Runs on this laptop and uses no data.', blocked: false, kind: 'device' }
   }
   if (decision.deferred) {
     return {
@@ -74,6 +78,7 @@ export function previewRun({
             ? "You're offline and this laptop's AI isn't ready, so this will wait for a connection."
             : "You're offline, so this will wait and go to the cloud when you're back online.",
       blocked: false,
+      kind: 'queued',
     }
   }
   const text = typeof prompt === 'function' ? prompt(decision.target) : prompt
@@ -86,5 +91,6 @@ export function previewRun({
           ? `This laptop is slow at AI, so this runs in the cloud and uses about ${size} of data.`
           : `Runs in the cloud and uses about ${size} of data.`,
     blocked: false,
+    kind: 'cloud',
   }
 }

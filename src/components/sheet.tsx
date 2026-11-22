@@ -8,20 +8,71 @@ import { parseAiText } from '../ai/summaries'
 import { dataSize, seconds } from '../lib/format'
 import { networkLabel, useNetwork, type NetworkState } from '../lib/network'
 import { forcedTarget, setRunOn, useRunOn, type RunOn } from '../lib/runOn'
+import type { DotKind, RunPreview } from './sheetStyles'
 
-/** A row of the sheet, with an optional note written in the margin. */
+/** A row of the sheet, to the right of the margin rule, with an optional note written in the margin. */
 export function Row({ note, noteClass = '', children }: { note?: ReactNode; noteClass?: string; children?: ReactNode }) {
   return (
     <div className="relative">
       {note !== undefined && <span className={`margin-note ${noteClass}`}>{note}</span>}
-      <div className="past-margin pr-5 sm:pr-8">{children}</div>
+      <div className="past-margin pr-5 sm:pr-7">{children}</div>
     </div>
   )
 }
 
-/** One blank ruled line between sections. */
-export function Gap() {
-  return <div style={{ height: 'var(--line)' }} aria-hidden />
+/** Says what this part of the sheet is, with an optional note on the right. */
+export function SheetHeading({ children, aside }: { children: ReactNode; aside?: ReactNode }) {
+  return (
+    <Row>
+      <div className="flex items-baseline justify-between gap-4">
+        <h2 className="on-lines font-sans text-[1rem] font-[680] tracking-[-0.005em] text-ink">{children}</h2>
+        {aside !== undefined && <span className="on-lines shrink-0 font-sans text-[0.78rem] text-pencil">{aside}</span>}
+      </div>
+    </Row>
+  )
+}
+
+/** Plain-words lead-in under a heading. */
+export function Lead({ children }: { children: ReactNode }) {
+  return (
+    <Row>
+      <p className="on-lines font-sans text-[0.9rem] text-ink">{children}</p>
+    </Row>
+  )
+}
+
+const DOT_CLASS: Record<DotKind, string> = {
+  device: 'bg-local',
+  cloud: 'bg-cloud',
+  queued: 'border-[1.5px] border-cloud',
+  blocked: 'bg-margin',
+  idle: 'bg-pencil/60',
+}
+
+const WHERE_CLASS: Record<DotKind, string> = {
+  device: 'text-local',
+  cloud: 'text-cloud',
+  queued: 'text-cloud',
+  blocked: 'text-margin',
+  idle: 'text-ink',
+}
+
+/** A small coloured dot: green for this laptop, blue for the cloud, an open ring for queued. */
+export function Dot({ kind, pulse = false }: { kind: DotKind; pulse?: boolean }) {
+  return <span className={`inline-block h-2 w-2 shrink-0 rounded-full ${DOT_CLASS[kind]} ${pulse ? 'animate-pulse' : ''}`} aria-hidden />
+}
+
+/** A dot that lines up with the first line of the text beside it. */
+function DotSlot({ kind, pulse }: { kind: DotKind; pulse?: boolean }) {
+  return (
+    <span className="flex h-[var(--line)] shrink-0 items-center">
+      <Dot kind={kind} pulse={pulse} />
+    </span>
+  )
+}
+
+function Sep() {
+  return <span aria-hidden>·</span>
 }
 
 /** Renders **bold** spans from model output. */
@@ -64,36 +115,67 @@ export function AiText({ text }: { text: string }) {
   )
 }
 
-/** Where it ran, how long it took and the data used, stacked in the margin like marks on a script. */
-export function MarginMarks({
+/** The badge on every answer: where it ran, how long it took and the data it used. Actions sit on the right. */
+export function SourceBadge({
   source,
   totalMs,
   bytes,
   edited = false,
+  children,
 }: {
   source: Target
   totalMs: number
   bytes: number
   edited?: boolean
+  children?: ReactNode
 }) {
-  const local = source === 'on_device'
-  const marks: Array<{ text: string; className: string }> = [
-    { text: local ? 'device' : 'cloud', className: local ? 'text-local' : 'text-cloud' },
-    { text: seconds(totalMs), className: '' },
-    { text: dataSize(bytes), className: '' },
-  ]
-  if (edited) marks.push({ text: 'edited', className: 'text-pen' })
+  const kind: DotKind = source === 'on_device' ? 'device' : 'cloud'
   return (
-    <div
-      className="absolute left-0 top-0"
-      aria-label={`Ran ${local ? 'on this device' : 'in the cloud'}, took ${seconds(totalMs)}, used ${dataSize(bytes)} of data${edited ? ', edited by you' : ''}`}
-    >
-      {marks.map((mark, index) => (
-        <span key={index} className={`margin-note ${mark.className}`} style={{ top: `calc(var(--line) * ${index})` }}>
-          {mark.text}
-        </span>
-      ))}
-    </div>
+    <Row>
+      <div className="on-lines flex flex-wrap items-center justify-between gap-x-4">
+        <p className="figures flex flex-wrap items-center gap-x-2 font-sans text-[0.78rem] text-pencil">
+          <Dot kind={kind} />
+          <span className={`font-[640] ${WHERE_CLASS[kind]}`}>{kind === 'device' ? 'This laptop' : 'Cloud'}</span>
+          <Sep />
+          <span>{seconds(totalMs)}</span>
+          <Sep />
+          <span>{bytes === 0 ? 'no data used' : `${dataSize(bytes)} used`}</span>
+          {edited && (
+            <>
+              <Sep />
+              <span className="text-pen">edited by you</span>
+            </>
+          )}
+        </p>
+        {children && <div className="flex items-baseline gap-4">{children}</div>}
+      </div>
+    </Row>
+  )
+}
+
+/** Before a request runs: where it will go, why, and what it costs. */
+export function RunHint({ preview }: { preview: RunPreview }) {
+  return (
+    <Row>
+      <p data-run-hint className={`on-lines flex gap-2 font-sans text-[0.8rem] ${preview.blocked ? 'text-margin' : 'text-pencil'}`}>
+        <DotSlot kind={preview.kind} />
+        <span>{preview.text}</span>
+      </p>
+    </Row>
+  )
+}
+
+/** Something went wrong, in red, with what the student can do about it. */
+export function Problem({ message, children }: { message: string; children?: ReactNode }) {
+  return (
+    <Row>
+      <p className="on-lines flex items-center gap-2 font-sans text-[0.78rem] font-[640] text-margin">
+        <Dot kind="blocked" />
+        That didn&apos;t work
+      </p>
+      <p className="on-lines font-sans text-[0.88rem] text-margin">{message}</p>
+      {children && <p className="on-lines flex flex-wrap items-baseline gap-x-4">{children}</p>}
+    </Row>
   )
 }
 
@@ -116,9 +198,12 @@ export function Queued({
   onCancel: () => void
 }) {
   return (
-    <div className="relative" role="status">
-      <span className="margin-note text-cloud">queued</span>
-      <div className="past-margin pr-5 sm:pr-8">
+    <Row>
+      <div role="status">
+        <p className="on-lines flex items-center gap-2 font-sans text-[0.78rem]">
+          <Dot kind="queued" />
+          <span className="font-[640] text-cloud">Queued for the cloud</span>
+        </p>
         <p className="on-lines font-sans text-[0.88rem] text-ink">
           Waiting for a connection. It goes to the cloud by itself when you&apos;re back online.
         </p>
@@ -137,7 +222,7 @@ export function Queued({
           </button>
         </p>
       </div>
-    </div>
+    </Row>
   )
 }
 
@@ -152,27 +237,26 @@ export function Working({
   deviceMessage?: string
 }) {
   const elapsed = useElapsed(startedAt)
+  const kind: DotKind = target === 'on_device' ? 'device' : target ? 'cloud' : 'idle'
   return (
-    <div className="relative" role="status">
-      <span className={`margin-note ${target === 'on_device' ? 'text-local' : target ? 'text-cloud' : ''}`}>
-        {target === 'on_device' ? 'device' : target ? 'cloud' : '…'}
-      </span>
-      <span className="margin-note figures" style={{ top: 'var(--line)' }}>
-        {seconds(elapsed)}
-      </span>
-      <div className="past-margin pr-5 sm:pr-8">
-        <p className="on-lines font-sans text-[0.88rem] text-pencil">
-          {target === 'on_device'
-            ? deviceMessage
-            : target
-              ? 'Working in the cloud…'
-              : 'Choosing where to run…'}
+    <Row>
+      <div role="status">
+        <p className="on-lines figures flex items-center gap-2 font-sans text-[0.78rem] text-pencil">
+          <Dot kind={kind} pulse />
+          <span className={`font-[640] ${WHERE_CLASS[kind]}`}>
+            {kind === 'device' ? 'This laptop' : kind === 'cloud' ? 'Cloud' : 'Choosing where to run'}
+          </span>
+          <Sep />
+          <span aria-hidden>{seconds(elapsed)}</span>
+        </p>
+        <p className="on-lines font-sans text-[0.88rem] text-ink">
+          {kind === 'device' ? deviceMessage : kind === 'cloud' ? 'Working in the cloud…' : 'Choosing where to run…'}
         </p>
         <div className="flex items-center" style={{ height: 'var(--line)' }}>
           <div className="pencil-line w-full max-w-[16rem]" />
         </div>
       </div>
-    </div>
+    </Row>
   )
 }
 
@@ -209,53 +293,54 @@ function autoHelp(network: NetworkState, deviceReady: boolean, deviceFast: boole
   return 'Simple tasks stay on this laptop. Hard questions use the cloud.'
 }
 
-function DetailRow({ label, value }: { label: string; value: string }) {
-  return (
-    <p className="on-lines flex justify-between gap-4 font-sans text-[0.8rem]">
-      <span className="shrink-0 text-pencil">{label}</span>
-      <span className="figures truncate font-[560] text-ink">{value}</span>
-    </p>
-  )
-}
-
 /** The router's inputs and its recent decisions, for anyone curious (and for the demo). */
 function RouterDetails({ deviceStatus, runOn, network }: { deviceStatus: OnDeviceStatus | null; runOn: RunOn; network: NetworkState }) {
   const log = useRouteLog()
   const speed = useDeviceSpeed()
   const saver = runOn === 'on_device' ? 'On (This laptop)' : network.saveData ? 'On (browser)' : 'Off'
+  const rows: Array<[string, string]> = [
+    ['Connection', networkLabel(network)],
+    ["This laptop's AI", deviceStatus === 'available' ? 'Ready' : 'Not ready'],
+    ["This laptop's speed", speedLabel(speed)],
+    ['Data saver', saver],
+  ]
   return (
-    <>
-      <Row>
-        <DetailRow label="Connection" value={networkLabel(network)} />
-        <DetailRow label="This laptop's AI" value={deviceStatus === 'available' ? 'Ready' : 'Not ready'} />
-        <DetailRow label="This laptop's speed" value={speedLabel(speed)} />
-        <DetailRow label="Data saver" value={saver} />
-      </Row>
-      <Row note={log.length > 0 ? 'latest' : undefined}>
-        {log.length === 0 ? (
-          <p className="on-lines font-sans text-[0.8rem] text-pencil">Decisions will appear here as you study.</p>
-        ) : (
-          log.map((entry) => (
-            <p key={entry.id} className="on-lines font-sans text-[0.8rem] text-pencil">
-              <span className="font-[560] text-ink">
+    <div className="reveal mt-3 rounded-md border border-rule bg-sheet px-4 py-3 font-sans text-[0.8rem] leading-[1.5]">
+      <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1">
+        {rows.map(([label, value]) => (
+          <div key={label} className="contents">
+            <dt className="text-pencil">{label}</dt>
+            <dd className="figures text-right font-[560] text-ink">{value}</dd>
+          </div>
+        ))}
+      </dl>
+      <h3 className="mt-3 border-t border-rule pt-3 text-[0.72rem] font-[640] uppercase tracking-[0.06em] text-pencil">
+        Recent decisions
+      </h3>
+      {log.length === 0 ? (
+        <p className="mt-1 text-pencil">Decisions will appear here as you study.</p>
+      ) : (
+        <ul className="mt-1 space-y-1">
+          {log.map((entry) => (
+            <li key={entry.id} className="text-pencil">
+              <span className="font-[600] text-ink">
                 {TASK_LABELS[entry.task]}: {entry.deferred ? 'queued' : entry.target === 'on_device' ? 'this laptop' : 'cloud'}
               </span>
               {' · '}
               {entry.reason}
-            </p>
-          ))
-        )}
-      </Row>
-    </>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   )
 }
 
 /**
- * The student's choice of where AI runs, written on the ruled line like options on a
- * question paper: the chosen one is underlined in red, and the margin records where
- * everyday requests will go right now.
+ * The student's choice of where AI runs, above the sheet: a three-way switch, a dot
+ * for where everyday requests go right now, and why.
  */
-export function RunOnSwitch({ deviceStatus }: { deviceStatus: OnDeviceStatus | null }) {
+export function RunOnBar({ deviceStatus }: { deviceStatus: OnDeviceStatus | null }) {
   const runOn = useRunOn()
   const network = useNetwork()
   const deviceFast = deviceIsFast(useDeviceSpeed())
@@ -266,8 +351,7 @@ export function RunOnSwitch({ deviceStatus }: { deviceStatus: OnDeviceStatus | n
 
   const decision = decide({ task: 'summarise', force: forcedTarget(runOn), onDeviceStatus: deviceStatus, network, deviceFast })
   const problem = unavailable[runOn] ? `${unavailable[runOn]}. Choose another option.` : null
-  // Where everyday requests go right now: this laptop, the cloud, or the offline queue.
-  const target = problem ? null : decision.deferred ? 'queued' : decision.target
+  const kind: DotKind = problem ? 'blocked' : decision.deferred ? 'queued' : decision.target === 'on_device' ? 'device' : 'cloud'
   const help =
     problem ??
     (runOn === 'auto'
@@ -277,17 +361,12 @@ export function RunOnSwitch({ deviceStatus }: { deviceStatus: OnDeviceStatus | n
         : CHOICE_HELP[runOn])
 
   return (
-    <>
-      <Row
-        note={target === 'on_device' ? 'device' : target === 'in_cloud' ? 'cloud' : target === 'queued' ? 'queued' : 'none'}
-        noteClass={target === 'on_device' ? 'text-local' : target === 'queued' || target === 'in_cloud' ? 'text-cloud' : 'text-margin'}
-      >
-        <h2 id="run-ai-on" className="on-lines eyebrow">
+    <div className="px-4 pt-4 lg:px-5">
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        <h2 id="run-ai-on" className="font-sans text-[0.85rem] font-[680] text-ink">
           Run AI on
         </h2>
-      </Row>
-      <Row>
-        <div role="radiogroup" aria-labelledby="run-ai-on" className="on-lines flex flex-wrap gap-x-5">
+        <div role="radiogroup" aria-labelledby="run-ai-on" className="flex rounded-full border border-rule bg-sheet/60 p-[3px]">
           {RUN_ON_OPTIONS.map((option) => {
             const selected = runOn === option.id
             const disabled = Boolean(unavailable[option.id]) && !selected
@@ -295,12 +374,12 @@ export function RunOnSwitch({ deviceStatus }: { deviceStatus: OnDeviceStatus | n
               <label
                 key={option.id}
                 title={unavailable[option.id]}
-                className={`rounded-sm font-sans text-[0.9rem] transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ink ${
+                className={`rounded-full px-3.5 py-[5px] font-sans text-[0.82rem] leading-none transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ink ${
                   selected
-                    ? 'cursor-pointer font-[640] text-ink underline decoration-margin decoration-2 underline-offset-[5px]'
+                    ? 'cursor-pointer bg-ink font-[640] text-sheet'
                     : disabled
-                      ? 'cursor-not-allowed font-[500] text-pencil/50'
-                      : 'cursor-pointer font-[500] text-pencil hover:text-ink'
+                      ? 'cursor-not-allowed font-[520] text-pencil/50'
+                      : 'cursor-pointer font-[520] text-pencil hover:text-ink'
                 }`}
               >
                 <input
@@ -317,21 +396,24 @@ export function RunOnSwitch({ deviceStatus }: { deviceStatus: OnDeviceStatus | n
             )
           })}
         </div>
-      </Row>
-      <Row>
-        <p className={`on-lines font-sans text-[0.8rem] ${problem ? 'text-margin' : 'text-pencil'}`}>{help}</p>
-        <p className="on-lines">
+      </div>
+      <div className="mt-2.5 flex gap-2.5 font-sans text-[0.8rem] leading-[1.45]">
+        <span className="flex h-[1.45em] shrink-0 items-center">
+          <Dot kind={kind} />
+        </span>
+        <p className={problem ? 'text-margin' : 'text-pencil'}>
+          {help}{' '}
           <button
             type="button"
             onClick={() => setShowDetails((open) => !open)}
             aria-expanded={showDetails}
-            className="font-sans text-[0.8rem] font-[560] text-pencil hover:text-ink"
+            className="whitespace-nowrap font-[620] text-ink underline decoration-rule decoration-1 underline-offset-[3px] hover:decoration-ink"
           >
             {showDetails ? 'Hide how it decides' : 'How it decides'}
           </button>
         </p>
-      </Row>
+      </div>
       {showDetails && <RouterDetails deviceStatus={deviceStatus} runOn={runOn} network={network} />}
-    </>
+    </div>
   )
 }

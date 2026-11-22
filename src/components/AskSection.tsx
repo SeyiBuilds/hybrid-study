@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import type { OnDeviceStatus } from '../ai/client'
 import { askAboutPage, askIdFromKey, askJobPrefix, buildAskPrompt, type AskMeta } from '../ai/asks'
 import { classifyQuestion } from '../ai/difficulty'
@@ -7,21 +7,23 @@ import { deleteAnswer, listAnswers, type PageAnswer } from '../lib/library'
 import { hasUsableText, type PageText } from '../lib/pageText'
 import { useNetwork } from '../lib/network'
 import { forcedTarget, useRunOn } from '../lib/runOn'
-import { AiText, MarginMarks, Queued, Row, Working } from './sheet'
+import { AiText, Lead, Problem, Queued, Row, RunHint, SheetHeading, SourceBadge, Working } from './sheet'
 import { penField, pillButton, previewRun, quietButton } from './sheetStyles'
 
-function Question({ question, quote }: { question: string; quote?: string }) {
+/** One question on the sheet, written in blue pen, with the highlighted words it was about. */
+function Entry({ question, quote, children }: { question: string; quote?: string; children: ReactNode }) {
   return (
-    <>
+    <div style={{ marginTop: 'var(--line)' }}>
       {quote && (
         <Row>
           <p className="on-lines line-clamp-2 font-read text-[0.9rem] italic text-pencil">“{quote}”</p>
         </Row>
       )}
-      <Row note="you" noteClass="text-pen">
-        <p className="reading on-lines text-pen">{question}</p>
+      <Row>
+        <p className="reading on-lines font-[560] text-pen">{question}</p>
       </Row>
-    </>
+      {children}
+    </div>
   )
 }
 
@@ -115,17 +117,13 @@ export function AskSection({
 
   return (
     <section aria-label="Ask about this page">
-      <Row note="ask">
-        <h2 className="on-lines eyebrow">Ask about this page</h2>
-      </Row>
+      <SheetHeading>Ask about page {page.number}</SheetHeading>
 
       {!usable ? (
-        <Row>
-          <p className="on-lines font-sans text-[0.88rem] text-pencil">There is no text on this page to ask about.</p>
-        </Row>
+        <Lead>There is no text on this page to ask about.</Lead>
       ) : (
         <>
-          {quote && (
+          {quote ? (
             <Row>
               <p className="on-lines flex items-baseline gap-3">
                 <span className="min-w-0 truncate font-read text-[0.9rem] italic text-pencil">About “{quote}”</span>
@@ -134,8 +132,10 @@ export function AskSection({
                 </button>
               </p>
             </Row>
+          ) : (
+            <Lead>Ask anything about this page, or select words on the page and press Ask or Explain.</Lead>
           )}
-          <Row note="you" noteClass="text-pen">
+          <Row>
             <textarea
               ref={inputRef}
               value={question}
@@ -149,19 +149,18 @@ export function AskSection({
             />
           </Row>
           <Row>
-            <p className="on-lines flex flex-wrap items-center gap-x-4">
+            <p className="on-lines">
               <button type="button" onClick={submit} disabled={!canAsk} className={pillButton}>
                 Ask
               </button>
-              <span className={`font-sans text-[0.8rem] ${preview.blocked ? 'text-margin' : 'text-pencil'}`}>{preview.text}</span>
             </p>
           </Row>
+          <RunHint preview={preview} />
         </>
       )}
 
       {pending.map((job) => (
-        <div key={job.key} style={{ marginTop: 'var(--line)' }}>
-          <Question question={job.meta.question} quote={job.meta.quote} />
+        <Entry key={job.key} question={job.meta.question} quote={job.meta.quote}>
           {job.status === 'queued' ? (
             <Queued
               onDevice={
@@ -183,39 +182,26 @@ export function AskSection({
           ) : job.status === 'running' ? (
             <Working target={job.target} startedAt={job.startedAt} />
           ) : (
-            <>
-              <Row note="error" noteClass="text-margin">
-                <p className="on-lines font-sans text-[0.88rem] text-margin">{job.message}</p>
-              </Row>
-              <Row>
-                <p className="on-lines">
-                  <button type="button" onClick={() => dismissJob(job.key)} className={quietButton}>
-                    Dismiss
-                  </button>
-                </p>
-              </Row>
-            </>
+            <Problem message={job.message}>
+              <button type="button" onClick={() => dismissJob(job.key)} className={quietButton}>
+                Dismiss
+              </button>
+            </Problem>
           )}
-        </div>
+        </Entry>
       ))}
 
       {answers.map((answer) => (
-        <div key={answer.id} style={{ marginTop: 'var(--line)' }}>
-          <Question question={answer.question} quote={answer.quote} />
-          <div className="relative" style={{ minHeight: 'calc(var(--line) * 3)' }}>
-            <MarginMarks source={answer.source} totalMs={answer.totalMs} bytes={answer.bytes} />
-            <div className="past-margin pr-5 sm:pr-8">
-              <AiText text={answer.text} />
-            </div>
-          </div>
+        <Entry key={answer.id} question={answer.question} quote={answer.quote}>
+          <SourceBadge source={answer.source} totalMs={answer.totalMs} bytes={answer.bytes}>
+            <button type="button" onClick={() => void remove(answer.id)} className={quietButton}>
+              Remove
+            </button>
+          </SourceBadge>
           <Row>
-            <p className="on-lines">
-              <button type="button" onClick={() => void remove(answer.id)} className={quietButton}>
-                Remove
-              </button>
-            </p>
+            <AiText text={answer.text} />
           </Row>
-        </div>
+        </Entry>
       ))}
     </section>
   )

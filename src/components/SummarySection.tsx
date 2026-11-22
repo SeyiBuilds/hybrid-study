@@ -6,7 +6,7 @@ import { getPageSummary, savePageSummary, type PageSummary } from '../lib/librar
 import { hasUsableText, type PageText } from '../lib/pageText'
 import { useNetwork } from '../lib/network'
 import { forcedTarget, useRunOn } from '../lib/runOn'
-import { AiText, MarginMarks, Queued, Row, Working } from './sheet'
+import { AiText, Lead, Problem, Queued, Row, RunHint, SheetHeading, SourceBadge, Working } from './sheet'
 import { penField, pillButton, previewRun, quietButton, textButton } from './sheetStyles'
 
 function toEditable(text: string): string {
@@ -74,11 +74,7 @@ export function SummarySection({
 
   let body
   if (!usable) {
-    body = (
-      <Row>
-        <p className="on-lines font-sans text-[0.88rem] text-pencil">There is no text on this page to summarise.</p>
-      </Row>
-    )
+    body = <Lead>There is no text on this page to summarise.</Lead>
   } else if (job?.status === 'queued') {
     body = (
       <Queued
@@ -97,23 +93,17 @@ export function SummarySection({
     body = <Working target={job.target} startedAt={job.startedAt} />
   } else if (job?.status === 'error') {
     body = (
-      <>
-        <Row note="error" noteClass="text-margin">
-          <p className="on-lines font-sans text-[0.88rem] text-margin">{job.message}</p>
-        </Row>
-        <Row>
-          <p className="on-lines">
-            <button type="button" onClick={start} className={textButton} disabled={preview.blocked}>
-              Try again
-            </button>
-          </p>
-        </Row>
-      </>
+      <Problem message={job.message}>
+        <button type="button" onClick={start} className={textButton} disabled={preview.blocked}>
+          Try again
+        </button>
+      </Problem>
     )
   } else if (summary && draft !== null) {
     body = (
       <>
-        <Row note="you" noteClass="text-pen">
+        <Row>
+          <p className="on-lines font-sans text-[0.8rem] text-pencil">Rewrite it in your own words. One point per line.</p>
           <textarea
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
@@ -138,12 +128,10 @@ export function SummarySection({
   } else if (summary) {
     body = (
       <>
-        <div className="relative" style={{ minHeight: `calc(var(--line) * ${summary.edited ? 4 : 3})` }}>
-          <MarginMarks source={summary.source} totalMs={summary.totalMs} bytes={summary.bytes} edited={summary.edited} />
-          <div className="past-margin pr-5 sm:pr-8">
-            <AiText text={summary.text} />
-          </div>
-        </div>
+        <SourceBadge source={summary.source} totalMs={summary.totalMs} bytes={summary.bytes} edited={summary.edited} />
+        <Row>
+          <AiText text={summary.text} />
+        </Row>
         <Row>
           <p className="on-lines flex flex-wrap items-baseline gap-x-4">
             <button type="button" onClick={() => setDraft(toEditable(summary.text))} className={textButton}>
@@ -159,6 +147,7 @@ export function SummarySection({
   } else if (loaded) {
     body = (
       <>
+        <Lead>The main points of this page in 3 to 5 bullets, which you can edit.</Lead>
         <Row>
           <p className="on-lines">
             <button type="button" onClick={start} disabled={preview.blocked} className={pillButton}>
@@ -166,9 +155,7 @@ export function SummarySection({
             </button>
           </p>
         </Row>
-        <Row>
-          <p className={`on-lines font-sans text-[0.8rem] ${preview.blocked ? 'text-margin' : 'text-pencil'}`}>{preview.text}</p>
-        </Row>
+        <RunHint preview={preview} />
       </>
     )
   } else {
@@ -177,9 +164,7 @@ export function SummarySection({
 
   return (
     <section aria-label="Summary" aria-live="polite">
-      <Row note={<span className="figures">p.&nbsp;{page.number}</span>}>
-        <h2 className="on-lines eyebrow">Summary</h2>
-      </Row>
+      <SheetHeading>Summary of page {page.number}</SheetHeading>
       {body}
     </section>
   )

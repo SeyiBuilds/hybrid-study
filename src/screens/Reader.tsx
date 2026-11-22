@@ -1,11 +1,13 @@
-import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react'
 import { askAboutPage, EXPLAIN_QUESTION } from '../ai/asks'
 import type { OnDeviceStatus } from '../ai/client'
 import { AskSection } from '../components/AskSection'
 import { MarkToolbar, type ToolbarTarget } from '../components/MarkToolbar'
 import { NotesSection } from '../components/NotesSection'
 import { PdfPage, type PageSelection } from '../components/PdfPage'
-import { Gap, RunOnSwitch } from '../components/sheet'
+import { Row, RunOnBar } from '../components/sheet'
+import { SheetTabs } from '../components/SheetTabs'
+import { useSheetActivity, useSheetTab } from '../lib/sheetTab'
 import { QuizSection } from '../components/QuizSection'
 import { SummarySection } from '../components/SummarySection'
 import { newId } from '../lib/highlights'
@@ -127,43 +129,45 @@ function Block({ block, first }: { block: TextBlock; first: boolean }) {
   )
 }
 
-/** The cleaned-up text the AI reads, folded away until the student wants to check it. */
+/** The cleaned-up text the AI reads, folded away at the foot of the sheet until the student wants to check it. */
 function PageTextSection({ page }: { page: PageText }) {
   const [open, setOpen] = useState(false)
   const usable = hasUsableText(page)
 
   return (
-    <section aria-label="Text the AI reads">
-      <div className="relative">
-        <span className="margin-note figures">{usable ? `${page.words} w` : ''}</span>
-        <p className="past-margin on-lines flex items-baseline gap-4 pr-5">
-          <span className="eyebrow">What the AI reads</span>
+    <section aria-label="Text the AI reads" style={{ marginTop: 'calc(var(--line) * 2)' }}>
+      <Row>
+        <p className="on-lines flex items-baseline justify-between gap-4">
+          <span className="font-sans text-[0.82rem] font-[640] text-pencil">
+            What the AI reads
+            {usable && <span className="figures font-[500]"> · {page.words} words</span>}
+          </span>
           {usable && (
             <button
               type="button"
               onClick={() => setOpen((value) => !value)}
               aria-expanded={open}
-              className="font-sans text-[0.8rem] font-[560] text-pencil hover:text-ink"
+              className="font-sans text-[0.8rem] font-[600] text-ink underline decoration-rule underline-offset-[3px] hover:decoration-ink"
             >
               {open ? 'Hide' : 'Show'}
             </button>
           )}
         </p>
-      </div>
-      <div className="past-margin reading pr-5 sm:pr-8">
-        {!usable ? (
-          <p className="on-lines text-pencil">
-            This page has no selectable text. It is probably a scanned image or a picture of a slide, so summaries,
-            questions and highlights skip it.
-          </p>
-        ) : open ? (
-          page.blocks.map((block, index) => <Block key={index} block={block} first={index === 0} />)
-        ) : (
-          <p className="on-lines font-sans text-[0.82rem] text-pencil">
-            The page&apos;s text, cleaned up from the PDF. Summaries and answers are based on it.
-          </p>
-        )}
-      </div>
+        <div className="reading">
+          {!usable ? (
+            <p className="on-lines text-pencil">
+              This page has no selectable text. It is probably a scanned image or a picture of a slide, so summaries,
+              questions and highlights skip it.
+            </p>
+          ) : open ? (
+            page.blocks.map((block, index) => <Block key={index} block={block} first={index === 0} />)
+          ) : (
+            <p className="on-lines font-sans text-[0.8rem] text-pencil">
+              The page&apos;s text, cleaned up from the PDF. Summaries and answers are based on it.
+            </p>
+          )}
+        </div>
+      </Row>
     </section>
   )
 }
@@ -286,7 +290,15 @@ function ReaderView({
   const [flashId, setFlashId] = useState<string | null>(null)
   const [focusNoteId, setFocusNoteId] = useState<string | null>(null)
   const [askPrefill, setAskPrefill] = useState<{ quote: string; nonce: number } | null>(null)
+  const [sheetTab, setSheetTab] = useSheetTab()
+  const activity = useSheetActivity(summary.id, current)
+  const paperRef = useRef<HTMLDivElement>(null)
   const pageHighlights = highlights.page === current ? highlights.list : []
+
+  // A new page or a different tab starts at the top of the sheet.
+  useEffect(() => {
+    paperRef.current?.scrollTo({ top: 0 })
+  }, [current, sheetTab])
 
   const go = (n: number) => {
     const next = Math.min(Math.max(1, n), total)
@@ -386,6 +398,7 @@ function ReaderView({
     setToolbar(null)
     if (!highlight) return
     setMobileView('study')
+    setSheetTab('notes')
     setFocusNoteId(null)
     window.requestAnimationFrame(() => setFocusNoteId(highlight.id))
   }
@@ -395,6 +408,7 @@ function ReaderView({
     setToolbar(null)
     if (!quote) return
     setMobileView('study')
+    setSheetTab('ask')
     setAskPrefill({ quote, nonce: Date.now() })
   }
 
@@ -405,6 +419,7 @@ function ReaderView({
     if (!quote) return
     window.getSelection()?.removeAllRanges()
     setMobileView('study')
+    setSheetTab('ask')
     void askAboutPage({
       documentId: summary.id,
       title: summary.title,
@@ -415,9 +430,8 @@ function ReaderView({
       quote,
       force: forcedTarget(runOn),
     })
-    window.requestAnimationFrame(() =>
-      document.querySelector('section[aria-label="Ask about this page"]')?.scrollIntoView({ block: 'start', behavior: 'smooth' }),
-    )
+    // The new question appears just under the question box.
+    window.requestAnimationFrame(() => paperRef.current?.scrollTo({ top: 0, behavior: 'smooth' }))
   }
 
   const onToolbarRemove = () => {
@@ -445,7 +459,7 @@ function ReaderView({
   )
 
   return (
-    <div className="mx-auto max-w-[1600px] lg:grid lg:h-[calc(100dvh-3.5rem)] lg:grid-cols-[minmax(0,1fr)_minmax(21rem,27rem)] xl:grid-cols-[13rem_minmax(0,1fr)_minmax(23rem,31rem)]">
+    <div className="mx-auto max-w-[1600px] lg:grid lg:h-[calc(100dvh-3.5rem)] lg:grid-cols-[minmax(0,1fr)_minmax(23rem,29rem)] xl:grid-cols-[13rem_minmax(0,1fr)_minmax(26rem,34rem)]">
       <aside className="hidden overflow-y-auto border-r border-rule xl:block">
         <PageIndex pages={content.pages} current={current} onSelect={go} />
       </aside>
@@ -471,53 +485,59 @@ function ReaderView({
       </section>
 
       <section
-        className={`overflow-y-auto border-rule px-4 pb-6 lg:block lg:border-l lg:px-0 lg:pb-0 ${
-          mobileView === 'study' ? 'block pt-4' : 'hidden'
-        }`}
+        className={`pb-2 lg:flex lg:min-h-0 lg:flex-col lg:border-l lg:border-rule lg:pb-0 ${mobileView === 'study' ? 'block' : 'hidden'}`}
         aria-label="Study sheet"
       >
-        <article className="ruled relative min-h-full" aria-label={`Study sheet for page ${current}`}>
-          <div style={{ paddingTop: 'var(--line)', paddingBottom: 'calc(var(--line) * 3)' }}>
-            <RunOnSwitch deviceStatus={connectivity.deviceStatus} />
-            <Gap />
-            <SummarySection
-              documentId={summary.id}
-              title={summary.title}
-              page={page}
-              deviceStatus={connectivity.deviceStatus}
-            />
-            <Gap />
-            <AskSection
-              documentId={summary.id}
-              title={summary.title}
-              page={page}
-              pages={content.pages}
-              deviceStatus={connectivity.deviceStatus}
-              prefill={askPrefill}
-            />
-            <Gap />
-            <QuizSection
-              key={`${summary.id}:${current}`}
-              documentId={summary.id}
-              title={summary.title}
-              page={page}
-              deviceStatus={connectivity.deviceStatus}
-            />
-            <Gap />
-            <NotesSection
-              documentId={summary.id}
-              page={current}
-              highlights={pageHighlights}
-              focusNoteId={focusNoteId}
-              onChangeHighlight={storeHighlight}
-              onRemoveHighlight={removeHighlight}
-              onShowHighlight={showHighlight}
-            />
-            <Gap />
+        <article className="flex flex-col lg:min-h-0 lg:flex-1" aria-label={`Study sheet for page ${current}`}>
+          <RunOnBar deviceStatus={connectivity.deviceStatus} />
+          <SheetTabs tab={sheetTab} onTab={setSheetTab} activity={activity} counts={{ notes: pageHighlights.length }} />
+          <div
+            ref={paperRef}
+            className="ruled relative mx-4 mb-4 min-h-[calc(var(--line)*12)] rounded-b-[6px] rounded-tr-[6px] border border-rule shadow-[0_18px_40px_-28px_rgb(24_40_72/0.5)] lg:mx-5 lg:mb-5 lg:min-h-0 lg:flex-1 lg:overflow-y-auto"
+            style={{ '--margin': '3.25rem', paddingTop: 'var(--line)', paddingBottom: 'calc(var(--line) * 2)' } as CSSProperties}
+          >
+            <div role="tabpanel" id="sheet-panel-summary" aria-labelledby="sheet-tab-summary" hidden={sheetTab !== 'summary'}>
+              <SummarySection
+                documentId={summary.id}
+                title={summary.title}
+                page={page}
+                deviceStatus={connectivity.deviceStatus}
+              />
+            </div>
+            <div role="tabpanel" id="sheet-panel-ask" aria-labelledby="sheet-tab-ask" hidden={sheetTab !== 'ask'}>
+              <AskSection
+                documentId={summary.id}
+                title={summary.title}
+                page={page}
+                pages={content.pages}
+                deviceStatus={connectivity.deviceStatus}
+                prefill={askPrefill}
+              />
+            </div>
+            <div role="tabpanel" id="sheet-panel-quiz" aria-labelledby="sheet-tab-quiz" hidden={sheetTab !== 'quiz'}>
+              <QuizSection
+                key={`${summary.id}:${current}`}
+                documentId={summary.id}
+                title={summary.title}
+                page={page}
+                deviceStatus={connectivity.deviceStatus}
+              />
+            </div>
+            <div role="tabpanel" id="sheet-panel-notes" aria-labelledby="sheet-tab-notes" hidden={sheetTab !== 'notes'}>
+              <NotesSection
+                documentId={summary.id}
+                page={current}
+                highlights={pageHighlights}
+                focusNoteId={focusNoteId}
+                onChangeHighlight={storeHighlight}
+                onRemoveHighlight={removeHighlight}
+                onShowHighlight={showHighlight}
+              />
+            </div>
             <PageTextSection page={page} />
           </div>
         </article>
-        <div className="py-4 lg:hidden">
+        <div className="pb-4 lg:hidden">
           <PageControls current={current} total={total} onGo={go} />
         </div>
       </section>

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { highlightFill } from '../lib/highlights'
 import { getNote, saveNote, type Highlight } from '../lib/library'
-import { Row } from './sheet'
+import { Lead, Row, SheetHeading } from './sheet'
 import { penField, quietButton } from './sheetStyles'
 
 /** Saves a value a moment after the student stops typing. */
@@ -42,9 +42,9 @@ function PageNotes({ documentId, page }: { documentId: string; page: number }) {
 
   return (
     <>
-      <Row note={state === 'saving' ? '…' : state === 'saved' ? 'saved' : 'you'} noteClass="text-pen">
-        <h2 className="on-lines eyebrow">My notes</h2>
-      </Row>
+      <SheetHeading aside={state === 'saving' ? 'Saving…' : state === 'saved' ? 'Saved on this laptop' : undefined}>
+        My notes on page {page}
+      </SheetHeading>
       <Row>
         {text === null ? (
           <div style={{ height: 'calc(var(--line) * 3)' }} />
@@ -116,19 +116,15 @@ export function NotesSection({
     <section aria-label="My notes">
       <PageNotes key={`${documentId}:${page}`} documentId={documentId} page={page} />
 
-      <div style={{ marginTop: 'var(--line)' }}>
-        <Row note={<span className="figures">{highlights.length || ''}</span>}>
-          <h2 className="on-lines eyebrow">Highlights on this page</h2>
-        </Row>
+      <div style={{ marginTop: 'calc(var(--line) * 2)' }}>
+        <SheetHeading aside={highlights.length > 0 ? <span className="figures">{highlights.length}</span> : undefined}>
+          Highlights on page {page}
+        </SheetHeading>
         {highlights.length === 0 ? (
-          <Row>
-            <p className="on-lines font-sans text-[0.85rem] text-pencil">
-              Select words on the page to highlight them, add a note or ask about them.
-            </p>
-          </Row>
+          <Lead>Select words on the page to highlight them, add a note or ask about them.</Lead>
         ) : (
-          highlights.map((highlight) => (
-            <div key={highlight.id} className="relative">
+          highlights.map((highlight, index) => (
+            <div key={highlight.id} className="relative" style={index > 0 ? { marginTop: 'var(--line)' } : undefined}>
               <span
                 className="absolute bottom-[6px] top-[6px] w-[3px] rounded-full"
                 style={{ left: 'calc(var(--margin) + 0.35rem)', background: highlightFill[highlight.color] }}

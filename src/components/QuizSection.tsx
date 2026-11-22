@@ -3,12 +3,11 @@ import type { OnDeviceStatus } from '../ai/client'
 import { cancelQueued, useJob } from '../ai/jobs'
 import { hasEnoughForQuiz, type QuizQuestion } from '../ai/quiz'
 import { buildQuizPrompt, generateQuiz, quizJobKey } from '../ai/quizzes'
-import { dataSize, seconds } from '../lib/format'
 import { getPageQuiz, savePageQuiz, type PageQuiz } from '../lib/library'
 import type { PageText } from '../lib/pageText'
 import { useNetwork } from '../lib/network'
 import { forcedTarget, useRunOn } from '../lib/runOn'
-import { Queued, Row, Working } from './sheet'
+import { Lead, Problem, Queued, Row, RunHint, SheetHeading, SourceBadge, Working } from './sheet'
 import { pillButton, previewRun, quietButton, textButton } from './sheetStyles'
 
 const LETTERS = ['A', 'B', 'C', 'D']
@@ -277,15 +276,10 @@ export function QuizSection({
 
   const answered = quiz ? quiz.answers.filter((value) => value !== null).length : 0
   const marked = quiz?.checkedAt != null
-  const onDevice = quiz?.source === 'on_device'
 
   let body
   if (!enough) {
-    body = (
-      <Row>
-        <p className="on-lines font-sans text-[0.88rem] text-pencil">There is not enough text on this page for a quiz.</p>
-      </Row>
-    )
+    body = <Lead>There is not enough text on this page for a quiz.</Lead>
   } else if (job?.status === 'queued') {
     body = (
       <Queued
@@ -312,33 +306,21 @@ export function QuizSection({
     body = (
       <>
         {job?.status === 'error' && (
-          <>
-            <Row note="error" noteClass="text-margin">
-              <p className="on-lines font-sans text-[0.88rem] text-margin">{job.message}</p>
-            </Row>
-            <Row>
-              <p className="on-lines">
-                <button type="button" onClick={start} disabled={preview.blocked} className={textButton}>
-                  Try again
-                </button>
-              </p>
-            </Row>
-          </>
+          <Problem message={job.message}>
+            <button type="button" onClick={start} disabled={preview.blocked} className={textButton}>
+              Try again
+            </button>
+          </Problem>
         )}
 
         {quiz ? (
           <div className="reveal">
             {marked && <Score quiz={quiz} animate={justMarked} onRetry={retry} />}
-            <Row note={onDevice ? 'device' : 'cloud'} noteClass={onDevice ? 'text-local' : 'text-cloud'}>
-              <p className="on-lines figures flex flex-wrap items-baseline justify-between gap-x-4 font-sans text-[0.8rem] text-pencil">
-                <span>
-                  {quiz.questions.length} questions · {seconds(quiz.totalMs)} · {dataSize(quiz.bytes)}
-                </span>
-                <button type="button" onClick={start} disabled={preview.blocked} className={`${quietButton} disabled:opacity-40`}>
-                  New questions
-                </button>
-              </p>
-            </Row>
+            <SourceBadge source={quiz.source} totalMs={quiz.totalMs} bytes={quiz.bytes}>
+              <button type="button" onClick={start} disabled={preview.blocked} className={`${quietButton} disabled:opacity-40`}>
+                New questions
+              </button>
+            </SourceBadge>
 
             {quiz.questions.map((question, index) => (
               <Question
@@ -378,6 +360,7 @@ export function QuizSection({
           saved !== undefined &&
           job?.status !== 'error' && (
             <>
+              <Lead>Five multiple-choice questions on this page. Choose your answers, then mark them.</Lead>
               <Row>
                 <p className="on-lines">
                   <button type="button" onClick={start} disabled={preview.blocked} className={pillButton}>
@@ -385,11 +368,7 @@ export function QuizSection({
                   </button>
                 </p>
               </Row>
-              <Row>
-                <p className={`on-lines font-sans text-[0.8rem] ${preview.blocked ? 'text-margin' : 'text-pencil'}`}>
-                  {preview.text}
-                </p>
-              </Row>
+              <RunHint preview={preview} />
             </>
           )
         )}
@@ -399,9 +378,7 @@ export function QuizSection({
 
   return (
     <section aria-label="Quiz">
-      <Row note="quiz">
-        <h2 className="on-lines eyebrow">Quiz me</h2>
-      </Row>
+      <SheetHeading>Quiz on page {page.number}</SheetHeading>
       {body}
     </section>
   )
