@@ -2,6 +2,30 @@
 
 What was built each day, what broke, and what we changed and why. Newest day first.
 
+## Sun 22 Nov 2026
+
+### Built
+- **"No internet" handling.** When a cloud request fails for network reasons while the browser still says online:
+  - the app treats the connection as offline
+  - hard questions go into the offline queue
+  - work the laptop can do is answered there instead
+  - the top bar says "No internet"
+- **Internet check.** While the cloud is unreachable, the app checks every 15 seconds whether it's back: a small request to the Firebase AI Logic host it already uses. When the check gets through, the queue is sent.
+- **Cloud timeout.** Cloud requests that haven't started answering after 45 seconds now give up (the SDK default is three minutes), so a dead connection is noticed quickly.
+
+### What broke
+- **A red "Error fetching … Failed to fetch".** Seyi asked "Compare XOR gate and the OR gate" while the top bar said Online. The router sent it to the cloud (hard question), but the internet wasn't getting through, and the student saw a raw error. `navigator.onLine` only means the laptop is connected to a network, not that the internet works, which is common with an empty data bundle or a router that has lost its connection.
+- **The new test failed on its first run.** It let App Check's token exchange go to the real network, which held up the first cloud request past the test's wait. The test now makes that exchange fail too, as it would with no internet. A test bug, not an app bug.
+
+### What we changed and why
+- **Network failures are told apart from refusals.** The SDK reports them as "Failed to fetch", or as a timeout abort, with no HTTP status. Real refusals such as an App Check 403 still show an error rather than being queued.
+- **The router decides again after a network failure.** Once the cloud is marked unreachable, the same request is re-routed as if offline: the laptop answers if it can, otherwise the request is queued. Any successful cloud answer marks the cloud reachable again.
+- **The queue flusher follows the app's own view of the connection,** not only the browser's `online` event, which never fires in this situation.
+- **Tested in headless Chrome** with the browser saying online while every cloud request fails: the hard question queued, a simple one answered on the laptop, the slow-laptop fallback worked, the queue was sent once the "internet" came back, and a 403 still showed an error. The queue, router, quiz and speed suites still pass.
+
+### Still open
+- Seyi to retry the same question with his real patchy connection.
+
 ## Fri 20 Nov 2026
 
 ### Built
