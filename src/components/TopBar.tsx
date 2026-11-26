@@ -88,7 +88,7 @@ function DataSaved() {
     <a
       href={`${routes.diagnostics}`}
       title={`Saved by answering ${ledger.onDeviceAnswers} ${ledger.onDeviceAnswers === 1 ? 'request' : 'requests'} on this laptop instead of the cloud`}
-      className="figures flex shrink-0 items-baseline gap-1.5 rounded-full px-3 py-1.5 text-[0.8rem] text-pencil transition-colors hover:bg-sheet hover:text-ink"
+      className="figures hidden shrink-0 items-baseline gap-1.5 rounded-full px-3 py-1.5 text-[0.8rem] text-pencil transition-colors hover:bg-sheet hover:text-ink sm:flex"
     >
       <span className="font-[680] text-local">{dataSize(ledger.savedBytes)}</span>
       <span>saved</span>

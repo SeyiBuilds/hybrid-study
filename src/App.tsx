@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { TopBar } from './components/TopBar'
 import { UpdatePrompt } from './components/UpdatePrompt'
+import { icons } from './components/icons'
 import { useConnectivity } from './lib/useConnectivity'
 import { useOnDeviceStartup } from './lib/useOnDeviceStartup'
 import { useQueueFlusher } from './lib/useQueueFlusher'
@@ -44,6 +45,14 @@ export default function App() {
               <>
                 <span className="h-4 w-px shrink-0 bg-rule" aria-hidden />
                 <span className="truncate text-[0.9rem] font-[600]">{docTitle}</span>
+                <a
+                  href={routes.exam(route.id)}
+                  title="Sit a timed exam on these notes"
+                  className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border border-rule px-3 text-[0.8rem] font-[620] text-ink transition-colors hover:bg-sheet"
+                >
+                  {icons.timer}
+                  <span className="hidden sm:inline">Exam mode</span>
+                </a>
               </>
             )}
             {route.name === 'exam' && docTitle && (

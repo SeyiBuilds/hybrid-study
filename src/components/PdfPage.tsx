@@ -111,7 +111,7 @@ export function PdfPage({
   }
 
   return (
-    <div ref={wrapRef} className="w-full overflow-x-auto pb-1">
+    <div ref={wrapRef} className={`w-full shrink-0 overflow-y-hidden pb-3 ${zoom > 1 ? 'overflow-x-auto' : 'overflow-x-hidden'}`}>
       <div
         ref={pageRef}
         onClick={onClick}
@@ -121,7 +121,7 @@ export function PdfPage({
         <canvas
           ref={canvasRef}
           aria-hidden
-          className={`block bg-white shadow-[0_1px_0_var(--color-rule),0_22px_48px_-28px_rgb(24_40_72/0.55)] transition-opacity duration-150 ${
+          className={`block bg-white shadow-[0_0_0_1px_rgb(0_0_0/0.06),0_6px_18px_-10px_rgb(0_0_0/0.45)] transition-opacity duration-150 ${
             rendering ? 'opacity-60' : 'opacity-100'
           }`}
         />

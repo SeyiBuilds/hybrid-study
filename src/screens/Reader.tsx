@@ -4,7 +4,9 @@ import type { OnDeviceStatus } from '../ai/client'
 import { AskSection } from '../components/AskSection'
 import { MarkToolbar, type ToolbarTarget } from '../components/MarkToolbar'
 import { NotesSection } from '../components/NotesSection'
-import { PageToolbar } from '../components/PageToolbar'
+import { IconButton } from '../components/controls'
+import { icons } from '../components/icons'
+import { ReaderBar } from '../components/ReaderBar'
 import { PdfPage, type PageSelection } from '../components/PdfPage'
 import { Row, RunOnBar } from '../components/sheet'
 import { SheetTabs } from '../components/SheetTabs'
@@ -181,7 +183,7 @@ function PageIndex({ pages, current, onSelect }: { pages: PageText[]; current: n
   }, [current])
 
   return (
-    <nav aria-label="Pages" className="py-4 pr-2">
+    <nav aria-label="Pages" className="pb-4 pr-2">
       <ol>
         {pages.map((page) => {
           const active = page.number === current
@@ -480,12 +482,31 @@ function ReaderView({
         enlarged
           ? 'lg:grid-cols-[minmax(0,1fr)]'
           : pagesOpen
-            ? 'lg:grid-cols-[minmax(0,1fr)_minmax(23rem,29rem)] xl:grid-cols-[13rem_minmax(0,1fr)_minmax(26rem,34rem)]'
-            : 'lg:grid-cols-[minmax(0,1fr)_minmax(23rem,29rem)] xl:grid-cols-[minmax(0,1fr)_minmax(26rem,34rem)]'
+            ? 'lg:grid-cols-[12rem_minmax(0,1fr)_clamp(22rem,34vw,31rem)]'
+            : 'lg:grid-cols-[3rem_minmax(0,1fr)_clamp(22rem,34vw,31rem)]'
       }`}
     >
-      <aside className={`hidden overflow-y-auto border-r border-rule ${pagesOpen && !enlarged ? 'xl:block' : ''}`}>
-        <PageIndex pages={content.pages} current={current} onSelect={go} />
+      {/* The page list, with its own hide/show toggle in the top corner; hidden, it leaves a thin rail. */}
+      <aside className={`hidden min-h-0 flex-col border-r border-rule ${enlarged ? '' : 'lg:flex'}`} aria-label="Page list">
+        {pagesOpen ? (
+          <>
+            <div className="flex h-12 shrink-0 items-center justify-between pl-4 pr-1.5">
+              <span className="eyebrow">Pages</span>
+              <IconButton label="Hide the page list" onClick={() => setPagesOpen(false)}>
+                {icons.hidePanel}
+              </IconButton>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              <PageIndex pages={content.pages} current={current} onSelect={go} />
+            </div>
+          </>
+        ) : (
+          <div className="flex h-12 shrink-0 items-center justify-center">
+            <IconButton label="Show the page list" onClick={() => setPagesOpen(true)}>
+              {icons.showPanel}
+            </IconButton>
+          </div>
+        )}
       </aside>
 
       <div className="mx-4 mt-4 flex gap-1 rounded-full border border-rule bg-desk p-1 lg:hidden">
@@ -494,18 +515,9 @@ function ReaderView({
       </div>
 
       <section
-        className={`flex-col gap-4 overflow-y-auto px-4 pb-6 pt-4 sm:px-8 lg:flex ${mobileView === 'page' ? 'flex' : 'hidden'}`}
+        className={`min-h-0 flex-col overflow-y-auto px-4 pt-4 sm:px-8 lg:flex lg:pt-6 ${mobileView === 'page' ? 'flex' : 'hidden'}`}
         aria-label="Page view"
       >
-        <PageToolbar
-          examHref={routes.exam(summary.id)}
-          pagesOpen={pagesOpen}
-          onTogglePages={() => setPagesOpen(!pagesOpen)}
-          zoom={zoom}
-          onZoom={setZoom}
-          enlarged={enlarged}
-          onToggleEnlarged={() => setEnlarged(!enlarged)}
-        />
         <PdfPage
           pdf={pdf}
           pageNumber={current}
@@ -515,7 +527,15 @@ function ReaderView({
           onSelection={onSelection}
           onHighlightClick={(highlight, anchor) => setToolbar({ kind: 'highlight', highlight, anchor })}
         />
-        <PageControls current={current} total={total} onGo={go} />
+        <ReaderBar
+          current={current}
+          total={total}
+          onGo={go}
+          zoom={zoom}
+          onZoom={setZoom}
+          enlarged={enlarged}
+          onToggleEnlarged={() => setEnlarged(!enlarged)}
+        />
       </section>
 
       <section

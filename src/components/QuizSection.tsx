@@ -8,6 +8,7 @@ import type { PageText } from '../lib/pageText'
 import { useNetwork } from '../lib/network'
 import { useQuizSettings, type QuizSettings } from '../lib/readerPrefs'
 import { forcedTarget, useRunOn } from '../lib/runOn'
+import { Segmented } from './controls'
 import { Rich } from './RichText'
 import { Lead, Problem, Queued, Row, RunHint, SheetHeading, SourceBadge, Working } from './sheet'
 import { pillButton, previewRun, quietButton, textButton } from './sheetStyles'
@@ -17,33 +18,28 @@ const MARK_STAGGER_MS = 140
 /** About what one question with options and an explanation comes to, for the data estimate. */
 const EXPECTED_CHARS_PER_QUESTION = 440
 
-/** How many questions and how hard, chosen before writing a quiz. */
-function QuizSettingsRow({ settings, onChange }: { settings: QuizSettings; onChange: (settings: QuizSettings) => void }) {
-  const chip = (selected: boolean) =>
-    `rounded-full px-2.5 py-[3px] font-[620] leading-none transition-colors ${
-      selected ? 'bg-ink text-sheet' : 'text-pencil hover:bg-desk hover:text-ink'
-    }`
+/** How many questions and how hard: two choices on the sheet, one per line, that read on their own. */
+function QuizSettingsForm({ settings, onChange }: { settings: QuizSettings; onChange: (settings: QuizSettings) => void }) {
   return (
-    <Row>
-      <div className="on-lines flex flex-wrap items-center gap-x-5 font-sans text-[0.8rem]">
-        <span className="flex items-center gap-1" role="group" aria-label="Number of questions">
-          <span className="mr-1 text-pencil">Questions</span>
-          {QUIZ_SIZES.map((count) => (
-            <button key={count} type="button" aria-pressed={settings.count === count} onClick={() => onChange({ ...settings, count })} className={`figures ${chip(settings.count === count)}`}>
-              {count}
-            </button>
-          ))}
-        </span>
-        <span className="flex items-center gap-1" role="group" aria-label="Difficulty">
-          <span className="mr-1 text-pencil">Level</span>
-          {QUIZ_LEVELS.map((level) => (
-            <button key={level.id} type="button" aria-pressed={settings.level === level.id} onClick={() => onChange({ ...settings, level: level.id })} className={chip(settings.level === level.id)}>
-              {level.label}
-            </button>
-          ))}
-        </span>
-      </div>
-    </Row>
+    <>
+      <Row>
+        <div className="on-lines flex items-center gap-2.5">
+          <Segmented
+            size="sm"
+            label="Number of questions"
+            value={settings.count}
+            options={QUIZ_SIZES.map((count) => ({ id: count, label: String(count) }))}
+            onChange={(count) => onChange({ ...settings, count })}
+          />
+          <span className="font-sans text-[0.8rem] text-pencil">questions</span>
+        </div>
+      </Row>
+      <Row>
+        <div className="on-lines flex items-center">
+          <Segmented size="sm" label="Difficulty" value={settings.level} options={QUIZ_LEVELS} onChange={(level) => onChange({ ...settings, level })} />
+        </div>
+      </Row>
+    </>
   )
 }
 
@@ -265,6 +261,8 @@ export function QuizSection({
   const [local, setLocal] = useState<PageQuiz | null>(null)
   const [justMarked, setJustMarked] = useState(false)
   const [settings, setSettings] = useQuizSettings()
+  // Choosing the size and difficulty of a fresh set of questions, below the current quiz's badge.
+  const [choosing, setChoosing] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -356,12 +354,37 @@ export function QuizSection({
         {quiz ? (
           <div className="reveal">
             {marked && <Score quiz={quiz} animate={justMarked} onRetry={retry} />}
-            {marked && <QuizSettingsRow settings={settings} onChange={setSettings} />}
             <SourceBadge source={quiz.source} totalMs={quiz.totalMs} bytes={quiz.bytes}>
-              <button type="button" onClick={start} disabled={preview.blocked} className={`${quietButton} disabled:opacity-40`}>
-                New questions
-              </button>
+              {!choosing && (
+                <button type="button" onClick={() => setChoosing(true)} className={quietButton}>
+                  New questions
+                </button>
+              )}
             </SourceBadge>
+            {choosing && (
+              <div style={{ marginBottom: 'var(--line)' }}>
+                <QuizSettingsForm settings={settings} onChange={setSettings} />
+                <Row>
+                  <p className="on-lines flex items-center gap-4">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setChoosing(false)
+                        start()
+                      }}
+                      disabled={preview.blocked}
+                      className={pillButton}
+                    >
+                      Write new questions
+                    </button>
+                    <button type="button" onClick={() => setChoosing(false)} className={quietButton}>
+                      Cancel
+                    </button>
+                  </p>
+                </Row>
+                <RunHint preview={preview} />
+              </div>
+            )}
 
             {quiz.questions.map((question, index) => (
               <Question
@@ -402,7 +425,7 @@ export function QuizSection({
           job?.status !== 'error' && (
             <>
               <Lead>Multiple-choice questions on this page. Choose your answers, then mark them.</Lead>
-              <QuizSettingsRow settings={settings} onChange={setSettings} />
+              <QuizSettingsForm settings={settings} onChange={setSettings} />
               <Row>
                 <p className="on-lines">
                   <button type="button" onClick={start} disabled={preview.blocked} className={pillButton}>

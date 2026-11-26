@@ -8,6 +8,7 @@ import { parseAiText } from '../ai/summaries'
 import { dataSize, seconds } from '../lib/format'
 import { networkLabel, useNetwork, type NetworkState } from '../lib/network'
 import { forcedTarget, setRunOn, useRunOn, type RunOn } from '../lib/runOn'
+import { Segmented } from './controls'
 import { MathBlock, Rich } from './RichText'
 import type { DotKind, RunPreview } from './sheetStyles'
 
@@ -362,36 +363,17 @@ export function RunOnBar({ deviceStatus }: { deviceStatus: OnDeviceStatus | null
         <h2 id="run-ai-on" className="font-sans text-[0.85rem] font-[680] text-ink">
           Run AI on
         </h2>
-        <div role="radiogroup" aria-labelledby="run-ai-on" className="flex rounded-full border border-rule bg-sheet/60 p-[3px]">
-          {RUN_ON_OPTIONS.map((option) => {
-            const selected = runOn === option.id
-            const disabled = Boolean(unavailable[option.id]) && !selected
-            return (
-              <label
-                key={option.id}
-                title={unavailable[option.id]}
-                className={`rounded-full px-3.5 py-[5px] font-sans text-[0.82rem] leading-none transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ink ${
-                  selected
-                    ? 'cursor-pointer bg-ink font-[640] text-sheet'
-                    : disabled
-                      ? 'cursor-not-allowed font-[520] text-pencil/50'
-                      : 'cursor-pointer font-[520] text-pencil hover:text-ink'
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="run-ai-on"
-                  value={option.id}
-                  checked={selected}
-                  disabled={disabled}
-                  onChange={() => setRunOn(option.id)}
-                  className="sr-only"
-                />
-                {option.label}
-              </label>
-            )
-          })}
-        </div>
+        <Segmented
+          labelledBy="run-ai-on"
+          value={runOn}
+          options={RUN_ON_OPTIONS.map((option) => ({
+            id: option.id,
+            label: option.label,
+            disabled: Boolean(unavailable[option.id]),
+            title: unavailable[option.id],
+          }))}
+          onChange={setRunOn}
+        />
       </div>
       <div className="mt-2.5 flex gap-2.5 font-sans text-[0.8rem] leading-[1.45]">
         <span className="flex h-[1.45em] shrink-0 items-center">

@@ -16,6 +16,7 @@ import {
 import { useJob } from '../ai/jobs'
 import { QUIZ_LEVELS, type QuizLevel } from '../ai/quiz'
 import { decide } from '../ai/router'
+import { Segmented } from '../components/controls'
 import { Rich } from '../components/RichText'
 import { AiText, Dot, Problem, Row, Working } from '../components/sheet'
 import { penField, pillButton, quietButton, textButton, type DotKind } from '../components/sheetStyles'
@@ -62,22 +63,7 @@ function Choice<T extends string | number | boolean>({
   return (
     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
       <span className="w-36 shrink-0 font-sans text-[0.86rem] font-[660] text-ink">{label}</span>
-      <div role="radiogroup" aria-label={label} className="flex w-fit flex-wrap rounded-[18px] border border-rule bg-desk/60 p-[3px]">
-        {options.map((option) => {
-          const selected = option.id === value
-          return (
-            <label
-              key={String(option.id)}
-              className={`cursor-pointer rounded-full px-3.5 py-[6px] font-sans text-[0.84rem] leading-none transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ink ${
-                selected ? 'bg-ink font-[640] text-sheet' : 'font-[520] text-pencil hover:text-ink'
-              }`}
-            >
-              <input type="radio" className="sr-only" checked={selected} onChange={() => onChange(option.id)} />
-              {option.label}
-            </label>
-          )
-        })}
-      </div>
+      <Segmented label={label} value={value} options={options} onChange={onChange} />
     </div>
   )
 }
@@ -898,20 +884,15 @@ function Results({ exam, doc }: { exam: Exam; doc: Loaded }) {
       </div>
 
       <div className="mt-7 flex flex-wrap items-center gap-x-5 gap-y-3">
-        <div role="radiogroup" aria-label="Show" className="flex rounded-full border border-rule bg-sheet/60 p-[3px] font-sans text-[0.84rem]">
-          {[
+        <Segmented
+          label="Show"
+          value={onlyMissed}
+          options={[
             { id: false, label: `All ${exam.questions.length}` },
             { id: true, label: `Missed ${missed.length}` },
-          ].map((option) => (
-            <label
-              key={String(option.id)}
-              className={`cursor-pointer rounded-full px-3.5 py-[5px] leading-none ${onlyMissed === option.id ? 'bg-ink font-[640] text-sheet' : 'text-pencil hover:text-ink'}`}
-            >
-              <input type="radio" className="sr-only" checked={onlyMissed === option.id} onChange={() => setOnlyMissed(option.id)} />
-              {option.label}
-            </label>
-          ))}
-        </div>
+          ]}
+          onChange={setOnlyMissed}
+        />
         <button type="button" onClick={() => void retake()} className={quietButton}>
           Retake these questions
         </button>
