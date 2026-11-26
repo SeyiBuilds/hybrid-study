@@ -119,7 +119,10 @@ export function renderPage(
     if (cancelled) return { scale: 1 }
     const base = page.getViewport({ scale: 1 })
     const scale = cssWidth / base.width
-    const ratio = Math.min(window.devicePixelRatio || 1, 2)
+    // Draw at extra density so small print and formulas stay crisp, but keep the canvas
+    // under about 4000 pixels wide so zoomed pages don't use too much memory.
+    const wanted = Math.max((window.devicePixelRatio || 1) * 1.5, 2)
+    const ratio = Math.max(1, Math.min(wanted, 4096 / cssWidth))
     const viewport = page.getViewport({ scale: scale * ratio })
 
     canvas.width = Math.floor(viewport.width)

@@ -26,7 +26,7 @@ function PenMark({ correct, animate, delayMs }: { correct: boolean; animate: boo
     ? ['M3 12.5c2.1 2.2 3.8 4.6 5.4 7.3C11.8 13.3 16 8 21.2 3.6']
     : ['M5 4.8c4.2 4.8 9 9.7 14.2 14.6', 'M19.4 4.4C14.2 9.2 9.5 14.2 4.6 19.8']
   return (
-    <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0 text-margin" fill="none" aria-hidden>
+    <svg viewBox="0 0 24 24" className={`h-4 w-4 shrink-0 ${correct ? 'text-local' : 'text-margin'}`} fill="none" aria-hidden>
       {paths.map((d) => (
         <path
           key={d}
@@ -66,7 +66,11 @@ function Question({
   return (
     <div style={{ marginTop: 'var(--line)' }}>
       <div className="relative">
-        <span className="margin-note figures flex h-[var(--line)] items-center justify-end gap-1">
+        <span
+          className={`margin-note figures flex h-[var(--line)] items-center justify-end gap-1 ${
+            marked ? (right ? 'font-[680] text-local' : 'font-[680] text-margin') : ''
+          }`}
+        >
           {marked && <PenMark correct={right} animate={animate} delayMs={index * MARK_STAGGER_MS} />}
           {index + 1}
         </span>
@@ -84,11 +88,11 @@ function Question({
           let badge = 'border-transparent text-pencil'
           if (marked) {
             if (isCorrect) {
-              text = 'font-[560] text-ink underline decoration-margin decoration-2 underline-offset-[5px]'
-              badge = 'border-margin text-margin'
+              text = 'font-[600] text-local underline decoration-local decoration-2 underline-offset-[5px]'
+              badge = 'border-local bg-local/10 text-local'
             } else if (chosen) {
-              text = 'text-pen line-through decoration-margin/70 decoration-1'
-              badge = 'border-pen text-pen'
+              text = 'text-margin line-through decoration-margin/70 decoration-1'
+              badge = 'border-margin bg-margin/10 text-margin'
             } else {
               text = 'text-pencil'
             }
@@ -149,6 +153,7 @@ function Score({
   const total = quiz.questions.length
   const earlier = quiz.scores.slice(0, -1)
   const draw = drawStyle(animate, total * MARK_STAGGER_MS)
+  const passed = (quiz.score ?? 0) * 2 >= total
 
   useEffect(() => {
     if (!animate) return
@@ -159,7 +164,7 @@ function Score({
   return (
     <div ref={ref} className="relative" style={{ minHeight: 'calc(var(--line) * 2)' }} role="status">
       <div
-        className="absolute grid h-[3.1rem] w-[3.1rem] -rotate-6 place-items-center text-margin"
+        className={`absolute grid h-[3.1rem] w-[3.1rem] -rotate-6 place-items-center ${passed ? 'text-local' : 'text-margin'}`}
         style={{ left: 'calc((var(--margin) - 3.1rem) / 2)', top: 'calc(var(--line) - 1.55rem)' }}
         aria-hidden
       >

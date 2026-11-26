@@ -19,11 +19,14 @@ export function PdfPage({
   pageNumber,
   highlights,
   flashId,
+  zoom,
   onSelection,
   onHighlightClick,
 }: {
   pdf: PDFDocumentProxy
   pageNumber: number
+  /** Size relative to the page fitting the reading area's width. */
+  zoom: number
   highlights: Highlight[]
   /** A highlight to draw attention to (e.g. picked from the study sheet). */
   flashId: string | null
@@ -42,7 +45,7 @@ export function PdfPage({
     const wrap = wrapRef.current
     if (!wrap) return
     // ResizeObserver already batches changes once per frame.
-    const observer = new ResizeObserver(([entry]) => setWidth(Math.min(Math.floor(entry.contentRect.width), 900)))
+    const observer = new ResizeObserver(([entry]) => setWidth(Math.min(Math.floor(entry.contentRect.width), 1100)))
     observer.observe(wrap)
     return () => observer.disconnect()
   }, [])
@@ -54,7 +57,7 @@ export function PdfPage({
     if (!canvas || !text || !page || width === 0) return
     setRendering(true)
     setError(null)
-    const job = renderPage(pdf, pageNumber, canvas, text, width)
+    const job = renderPage(pdf, pageNumber, canvas, text, Math.floor(width * zoom))
     job.done
       .then(({ scale }) => {
         page.style.setProperty('--total-scale-factor', String(scale))
@@ -65,7 +68,7 @@ export function PdfPage({
         setRendering(false)
       })
     return () => job.cancel()
-  }, [pdf, pageNumber, width])
+  }, [pdf, pageNumber, width, zoom])
 
   // Report finished selections inside the text layer; clear when the selection collapses.
   useEffect(() => {
@@ -108,7 +111,7 @@ export function PdfPage({
   }
 
   return (
-    <div ref={wrapRef} className="w-full">
+    <div ref={wrapRef} className="w-full overflow-x-auto pb-1">
       <div
         ref={pageRef}
         onClick={onClick}

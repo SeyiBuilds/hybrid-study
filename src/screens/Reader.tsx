@@ -4,6 +4,7 @@ import type { OnDeviceStatus } from '../ai/client'
 import { AskSection } from '../components/AskSection'
 import { MarkToolbar, type ToolbarTarget } from '../components/MarkToolbar'
 import { NotesSection } from '../components/NotesSection'
+import { PageToolbar } from '../components/PageToolbar'
 import { PdfPage, type PageSelection } from '../components/PdfPage'
 import { Row, RunOnBar } from '../components/sheet'
 import { SheetTabs } from '../components/SheetTabs'
@@ -34,6 +35,7 @@ import {
   type PDFDocumentProxy,
 } from '../lib/pdf'
 import { EXTRACT_VERSION, type TextBlock } from '../lib/pageText'
+import { usePagesPane, useZoom, ZOOM_STEPS } from '../lib/readerPrefs'
 import { forcedTarget, useRunOn } from '../lib/runOn'
 import { navigate, routes } from '../lib/useHashRoute'
 
@@ -291,6 +293,14 @@ function ReaderView({
   const [focusNoteId, setFocusNoteId] = useState<string | null>(null)
   const [askPrefill, setAskPrefill] = useState<{ quote: string; nonce: number } | null>(null)
   const [sheetTab, setSheetTab] = useSheetTab()
+  const [zoom, setZoom] = useZoom()
+  const [pagesOpen, setPagesOpen] = usePagesPane()
+  // Enlarged: the page fills the screen; the page list and study sheet step aside.
+  const [enlarged, setEnlarged] = useState(false)
+  const showStudy = () => {
+    setMobileView('study')
+    setEnlarged(false)
+  }
   const activity = useSheetActivity(summary.id, current)
   const paperRef = useRef<HTMLDivElement>(null)
   const pageHighlights = highlights.page === current ? highlights.list : []
@@ -323,13 +333,19 @@ function ReaderView({
     return () => window.clearTimeout(timer)
   }, [summary.id, current])
 
-  // Arrow keys and Page Up/Down turn pages, unless the reader is typing.
+  // Arrow keys and Page Up/Down turn pages, + and - zoom, Escape leaves the enlarged view,
+  // unless the reader is typing.
   useEffect(() => {
     const onKey = (event: globalThis.KeyboardEvent) => {
       const target = event.target as HTMLElement | null
       if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return
+      if (event.ctrlKey || event.metaKey || event.altKey) return
       if (event.key === 'ArrowRight' || event.key === 'PageDown') go(current + 1)
       if (event.key === 'ArrowLeft' || event.key === 'PageUp') go(current - 1)
+      const step = ZOOM_STEPS.indexOf(zoom)
+      if ((event.key === '+' || event.key === '=') && step < ZOOM_STEPS.length - 1) setZoom(ZOOM_STEPS[step + 1])
+      if (event.key === '-' && step > 0) setZoom(ZOOM_STEPS[step - 1])
+      if (event.key === 'Escape' && enlarged) setEnlarged(false)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -397,7 +413,7 @@ function ReaderView({
     const highlight = toolbar?.kind === 'highlight' ? toolbar.highlight : highlightSelection('yellow')
     setToolbar(null)
     if (!highlight) return
-    setMobileView('study')
+    showStudy()
     setSheetTab('notes')
     setFocusNoteId(null)
     window.requestAnimationFrame(() => setFocusNoteId(highlight.id))
@@ -407,7 +423,7 @@ function ReaderView({
     const quote = toolbar?.kind === 'highlight' ? toolbar.highlight.text : selection?.text
     setToolbar(null)
     if (!quote) return
-    setMobileView('study')
+    showStudy()
     setSheetTab('ask')
     setAskPrefill({ quote, nonce: Date.now() })
   }
@@ -418,7 +434,7 @@ function ReaderView({
     setToolbar(null)
     if (!quote) return
     window.getSelection()?.removeAllRanges()
-    setMobileView('study')
+    showStudy()
     setSheetTab('ask')
     void askAboutPage({
       documentId: summary.id,
@@ -459,8 +475,16 @@ function ReaderView({
   )
 
   return (
-    <div className="mx-auto max-w-[1600px] lg:grid lg:h-[calc(100dvh-3.5rem)] lg:grid-cols-[minmax(0,1fr)_minmax(23rem,29rem)] xl:grid-cols-[13rem_minmax(0,1fr)_minmax(26rem,34rem)]">
-      <aside className="hidden overflow-y-auto border-r border-rule xl:block">
+    <div
+      className={`mx-auto max-w-[1600px] lg:grid lg:h-[calc(100dvh-3.5rem)] ${
+        enlarged
+          ? 'lg:grid-cols-[minmax(0,1fr)]'
+          : pagesOpen
+            ? 'lg:grid-cols-[minmax(0,1fr)_minmax(23rem,29rem)] xl:grid-cols-[13rem_minmax(0,1fr)_minmax(26rem,34rem)]'
+            : 'lg:grid-cols-[minmax(0,1fr)_minmax(23rem,29rem)] xl:grid-cols-[minmax(0,1fr)_minmax(26rem,34rem)]'
+      }`}
+    >
+      <aside className={`hidden overflow-y-auto border-r border-rule ${pagesOpen && !enlarged ? 'xl:block' : ''}`}>
         <PageIndex pages={content.pages} current={current} onSelect={go} />
       </aside>
 
@@ -470,12 +494,21 @@ function ReaderView({
       </div>
 
       <section
-        className={`flex-col gap-5 overflow-y-auto px-4 py-6 sm:px-8 lg:flex ${mobileView === 'page' ? 'flex' : 'hidden'}`}
+        className={`flex-col gap-4 overflow-y-auto px-4 pb-6 pt-4 sm:px-8 lg:flex ${mobileView === 'page' ? 'flex' : 'hidden'}`}
         aria-label="Page view"
       >
+        <PageToolbar
+          pagesOpen={pagesOpen}
+          onTogglePages={() => setPagesOpen(!pagesOpen)}
+          zoom={zoom}
+          onZoom={setZoom}
+          enlarged={enlarged}
+          onToggleEnlarged={() => setEnlarged(!enlarged)}
+        />
         <PdfPage
           pdf={pdf}
           pageNumber={current}
+          zoom={zoom}
           highlights={pageHighlights}
           flashId={flashId}
           onSelection={onSelection}
@@ -485,7 +518,9 @@ function ReaderView({
       </section>
 
       <section
-        className={`pb-2 lg:flex lg:min-h-0 lg:flex-col lg:border-l lg:border-rule lg:pb-0 ${mobileView === 'study' ? 'block' : 'hidden'}`}
+        className={`pb-2 lg:min-h-0 lg:flex-col lg:border-l lg:border-rule lg:pb-0 ${
+          enlarged ? 'hidden' : `lg:flex ${mobileView === 'study' ? 'block' : 'hidden'}`
+        }`}
         aria-label="Study sheet"
       >
         <article className="flex flex-col lg:min-h-0 lg:flex-1" aria-label={`Study sheet for page ${current}`}>
