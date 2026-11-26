@@ -482,8 +482,8 @@ function ReaderView({
         enlarged
           ? 'lg:grid-cols-[minmax(0,1fr)]'
           : pagesOpen
-            ? 'lg:grid-cols-[12rem_minmax(0,1fr)_clamp(22rem,34vw,31rem)]'
-            : 'lg:grid-cols-[3rem_minmax(0,1fr)_clamp(22rem,34vw,31rem)]'
+            ? 'lg:grid-cols-[12rem_minmax(0,1fr)_minmax(23rem,29rem)] xl:grid-cols-[12rem_minmax(0,1fr)_minmax(26rem,34rem)]'
+            : 'lg:grid-cols-[3rem_minmax(0,1fr)_minmax(23rem,29rem)] xl:grid-cols-[3rem_minmax(0,1fr)_minmax(26rem,34rem)]'
       }`}
     >
       {/* The page list, with its own hide/show toggle in the top corner; hidden, it leaves a thin rail. */}
