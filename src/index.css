@@ -181,6 +181,17 @@ body {
   font-feature-settings: 'tnum' 0;
 }
 
+/* Formulas typeset by KaTeX: sized to sit with the reading text, on the paper's colours. */
+.math-block .katex-display {
+  margin: 0.2em 0;
+  padding: 0.15em 0;
+}
+.math-block .katex,
+.math-inline .katex {
+  font-size: 1.06em;
+  color: inherit;
+}
+
 /* Quiet scrollbars that match the paper. */
 * {
   scrollbar-width: thin;

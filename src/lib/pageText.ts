@@ -5,8 +5,10 @@
  * are recognised. The same clean text is what the AI reads.
  */
 
+import { fixSymbols } from './symbols'
+
 /** Bump when extraction changes, so stored documents are re-extracted on open. */
-export const EXTRACT_VERSION = 2
+export const EXTRACT_VERSION = 3
 
 /** One visual line of text on a page, in PDF units (y grows upwards). */
 export interface RawLine {
@@ -44,7 +46,7 @@ const LIST_MARKER = /^(?:[•▪◦●○■□➢►✓\-–*]|\(?\d{1,2}[.)]|\
 const ENTRY = /^(.{2,}?)\s…\s(\S{1,8})$/
 
 function clean(text: string): string {
-  return text.replace(LEADER, ' … ').replace(/\s+/g, ' ').trim()
+  return fixSymbols(text).replace(LEADER, ' … ').replace(/\s+/g, ' ').trim()
 }
 
 function edgeKey(text: string): string {

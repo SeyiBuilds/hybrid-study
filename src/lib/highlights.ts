@@ -1,4 +1,5 @@
 import type { Highlight, HighlightColor, HighlightRect } from './library'
+import { fixSymbols } from './symbols'
 
 export const HIGHLIGHT_COLORS: Array<{ id: HighlightColor; label: string }> = [
   { id: 'yellow', label: 'Yellow highlighter' },
@@ -14,7 +15,7 @@ export const highlightFill: Record<HighlightColor, string> = {
 }
 
 export function cleanSelectionText(text: string): string {
-  return text.replace(/\s+/g, ' ').trim()
+  return fixSymbols(text).replace(/\s+/g, ' ').trim()
 }
 
 /**

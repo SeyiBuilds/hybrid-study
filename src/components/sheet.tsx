@@ -8,6 +8,7 @@ import { parseAiText } from '../ai/summaries'
 import { dataSize, seconds } from '../lib/format'
 import { networkLabel, useNetwork, type NetworkState } from '../lib/network'
 import { forcedTarget, setRunOn, useRunOn, type RunOn } from '../lib/runOn'
+import { MathBlock, Rich } from './RichText'
 import type { DotKind, RunPreview } from './sheetStyles'
 
 /** A row of the sheet, to the right of the margin rule, with an optional note written in the margin. */
@@ -75,42 +76,35 @@ function Sep() {
   return <span aria-hidden>·</span>
 }
 
-/** Renders **bold** spans from model output. */
-function Inline({ text }: { text: string }) {
-  const parts = text.split(/\*\*(.+?)\*\*/g)
-  return (
-    <>
-      {parts.map((part, index) =>
-        index % 2 === 1 ? (
-          <strong key={index} className="font-[620]">
-            {part}
-          </strong>
-        ) : (
-          part.replace(/\*/g, '')
-        ),
-      )}
-    </>
-  )
-}
-
-/** AI text as bullets and lines, revealed whole once it is ready. */
+/** AI text as bullets, lines and formulas on their own lines, revealed whole once it is ready. */
 export function AiText({ text }: { text: string }) {
   return (
     <div className="reading reveal">
-      {parseAiText(text).map((line, index) =>
-        line.kind === 'item' ? (
-          <p key={index} className="on-lines flex gap-3">
-            <span className="mt-[calc(var(--line)/2-3px)] h-1.5 w-1.5 shrink-0 rounded-full bg-ink/70" aria-hidden />
-            <span className="min-w-0">
-              <Inline text={line.text} />
-            </span>
+      {parseAiText(text).map((line, index) => {
+        const indent = line.indent ? 'pl-[1.125rem]' : ''
+        if (line.kind === 'math') {
+          return (
+            <div key={index} className={`my-1 ${indent}`}>
+              <MathBlock tex={line.text} />
+            </div>
+          )
+        }
+        if (line.kind === 'item') {
+          return (
+            <p key={index} className="on-lines flex gap-3">
+              <span className="mt-[calc(var(--line)/2-3px)] h-1.5 w-1.5 shrink-0 rounded-full bg-ink/70" aria-hidden />
+              <span className="min-w-0">
+                <Rich text={line.text} />
+              </span>
+            </p>
+          )
+        }
+        return (
+          <p key={index} className={`on-lines ${indent}`}>
+            <Rich text={line.text} />
           </p>
-        ) : (
-          <p key={index} className="on-lines">
-            <Inline text={line.text} />
-          </p>
-        ),
-      )}
+        )
+      })}
     </div>
   )
 }

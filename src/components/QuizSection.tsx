@@ -7,6 +7,7 @@ import { getPageQuiz, savePageQuiz, type PageQuiz } from '../lib/library'
 import type { PageText } from '../lib/pageText'
 import { useNetwork } from '../lib/network'
 import { forcedTarget, useRunOn } from '../lib/runOn'
+import { Rich } from './RichText'
 import { Lead, Problem, Queued, Row, RunHint, SheetHeading, SourceBadge, Working } from './sheet'
 import { pillButton, previewRun, quietButton, textButton } from './sheetStyles'
 
@@ -75,7 +76,7 @@ function Question({
           {index + 1}
         </span>
         <p id={labelId} className="past-margin reading on-lines pr-5 font-[560] sm:pr-8">
-          {question.question}
+          <Rich text={question.question} />
           {marked && <span className="sr-only">{right ? ' You got this right.' : ' You got this wrong.'}</span>}
         </p>
       </div>
@@ -124,7 +125,7 @@ function Question({
                 {LETTERS[optionIndex]}
               </span>
               <span className={`min-w-0 ${text}`}>
-                {option}
+                <Rich text={option} />
                 {marked && isCorrect && <span className="sr-only"> (correct answer)</span>}
                 {marked && chosen && !isCorrect && <span className="sr-only"> (your answer)</span>}
               </span>
@@ -132,7 +133,9 @@ function Question({
           )
         })}
         {marked && question.explanation && (
-          <p className="on-lines font-sans text-[0.82rem] text-pencil">{question.explanation}</p>
+          <p className="on-lines font-sans text-[0.82rem] text-pencil">
+            <Rich text={question.explanation} />
+          </p>
         )}
       </div>
     </div>

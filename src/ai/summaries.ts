@@ -50,16 +50,62 @@ export function summarisePage(input: {
   })
 }
 
-export type AiLine = { kind: 'item' | 'para'; text: string }
+export interface AiLine {
+  kind: 'item' | 'para' | 'math'
+  text: string
+  /** Belongs to the bullet above (a formula under it, or text after that formula). */
+  indent?: boolean
+}
 
-/** Splits model output into bullet items and plain lines. */
+/**
+ * Formulas that get a line of their own: $$…$$ or \[…\] (possibly across lines or in the
+ * middle of a sentence), and any equation written inline as `…`, $…$ or \(…\).
+ */
+const DISPLAY_MATH =
+  /\$\$([\s\S]+?)\$\$|\\\[([\s\S]+?)\\\]|`([^`\n]*=[^`\n]*)`|\$(?!\s)([^$\n]*=[^$\n]*?)(?<!\s)\$|\\\(([^\n]*?=[^\n]*?)\\\)/g
+const MATH_MARK = '\u0000'
+const BULLET = /^(?:[-*•–]|\d{1,2}[.)])\s+(.*)$/
+const BARE_BULLET = /^(?:[-*•–]|\d{1,2}[.)])$/
+
+/**
+ * Splits model output into bullet items, plain lines and formulas. Display formulas
+ * always get a line of their own, under the bullet they belong to.
+ */
 export function parseAiText(text: string): AiLine[] {
-  return text
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => {
-      const bullet = line.match(/^(?:[-*•–]|\d{1,2}[.)])\s+(.*)$/)
-      return bullet ? { kind: 'item' as const, text: bullet[1] } : { kind: 'para' as const, text: line }
+  const marked = text
+    .replace(/\r/g, '')
+    .replace(DISPLAY_MATH, (_, ...groups: Array<string | undefined>) => {
+      const tex = (groups.slice(0, 5).find((group) => group !== undefined) ?? '').replace(/\s*\n\s*/g, ' ').trim()
+      return tex ? `\n${MATH_MARK}${tex}\n` : ''
     })
+  const lines: AiLine[] = []
+  let inItem = false
+  let afterMath = false
+  for (const raw of marked.split('\n')) {
+    const line = raw.trim()
+    // Skip empty lines, and lone punctuation left behind when a formula was lifted out of a sentence.
+    if (!line || (afterMath && /^[.,;:]+$/.test(line))) continue
+    if (line.startsWith(MATH_MARK)) {
+      lines.push({ kind: 'math', text: line.slice(1), indent: inItem })
+      afterMath = true
+      continue
+    }
+    if (BARE_BULLET.test(line)) {
+      inItem = true
+      afterMath = false
+      continue
+    }
+    const bullet = line.match(BULLET)
+    if (bullet) {
+      lines.push({ kind: 'item', text: bullet[1] })
+      inItem = true
+    } else {
+      // Text straight after a formula inside a bullet carries on that bullet.
+      const continues: boolean = inItem && afterMath
+      lines.push({ kind: 'para', text: line, indent: continues })
+      inItem = continues
+    }
+    afterMath = false
+  }
+  return lines
 }

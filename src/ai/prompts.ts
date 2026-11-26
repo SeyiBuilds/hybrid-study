@@ -8,6 +8,10 @@ import type { PageText } from '../lib/pageText'
 /** About 1,500 tokens of page text: comfortably inside the on-device limit with room for the answer. */
 const MAX_PAGE_CHARS = 6000
 
+/** How formulas should be written so the app can typeset them on their own lines. */
+const FORMULA_RULE =
+  'Write every formula, equation or calculation step on its own line as LaTeX between $$ and $$, directly under the sentence or bullet it belongs to, never in the middle of a sentence. For example:\n- Weight depends on mass and gravity:\n$$w = mg$$'
+
 function trimPage(text: string): string {
   if (text.length <= MAX_PAGE_CHARS) return text
   return `${text.slice(0, MAX_PAGE_CHARS)}\n[The rest of the page was cut to fit.]`
@@ -50,6 +54,8 @@ export function askPrompt({
   return [
     'You help a university student understand their lecture notes.',
     'Answer the question in plain English in at most 120 words. Use short bullet points starting with "- " only if they make the answer clearer.',
+    'If the answer involves a calculation, show each step and say briefly why it is done.',
+    FORMULA_RULE,
     documentText
       ? `Base the answer on the notes below. The student is reading page ${page}. If the notes do not contain the answer, start with "Not in these notes:" and answer briefly from general knowledge.`
       : 'Base the answer on the page text. If the page does not contain the answer, start with "Not on this page:" and answer briefly from general knowledge.',
@@ -73,6 +79,7 @@ export function quizPrompt({ pageText, title, page }: { pageText: string; title:
     '- Give each question 4 short options. Exactly one is correct; the other three must be believable but wrong according to the page.',
     '- "answer" is the letter of the correct option: A, B, C or D.',
     '- "explanation" is one short sentence saying why that answer is correct.',
+    '- Write formulas in plain text with symbols such as ×, ÷, ², ³, √, ρ, Σ and subscripts like V₁. Do not use LaTeX.',
     '- Do not ask about page numbers, headings or the course title.',
     'Reply with JSON only.',
     '',
@@ -91,6 +98,7 @@ export function summarisePrompt({ pageText, title, page }: { pageText: string; t
     'Keep key terms, definitions, numbers and formulas exactly as written.',
     'Use only information from the page. Do not add an introduction or a conclusion.',
     'Start each bullet with "- ".',
+    FORMULA_RULE,
     '',
     `Notes: ${title}, page ${page}`,
     'Page text:',
