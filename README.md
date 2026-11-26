@@ -14,7 +14,8 @@ Built for the [#BuildHybridAI 2026 hackathon](https://firebasehybridaihackathon.
 - **A study sheet for every page.** A ruled sheet beside the page with four tabs: Summary, Ask, Quiz and Notes (your own notes in "blue biro" and the page's highlights with their notes). Summaries can be edited into your own words. A tab shows a dot while something behind it is working or waiting.
 - **Formulas that read like a textbook.** Formulas and calculation steps go on their own lines under the point they belong to, typeset with KaTeX (fractions, powers, subscripts, Greek letters). Symbols that PDFs store in old encodings, which usually show as empty boxes, are repaired when the text is read.
 - **Summarise a page.** 3 to 5 bullets, shown whole when ready. Every answer carries a badge with where it ran, how long it took and roughly how much data it used, for example "This laptop · 6.1 s · no data used".
-- **Quiz me.** Five multiple-choice questions from the page. Choose your answers, then the sheet marks them like a script: a green tick or red cross in the margin, the right answer in green, a circled score and a short explanation for each question. Quizzes and scores are saved on the device.
+- **Quiz me.** 5, 10 or 15 multiple-choice questions from the page, easy, medium, hard or mixed. Choose your answers, then the sheet marks them like a script: a green tick or red cross in the margin, the right answer in green, a circled score and a short explanation for each question. Quizzes and scores are saved on the device.
+- **Exam mode.** A timed exam on a whole lecture note or a page range: 20, 40 or 60 questions, multiple choice with an optional written (theory) section, a chosen difficulty and time limit. Add a past-paper PDF and the new questions follow its style and difficulty without copying it. The notes close, a timer runs, answers save as you go, and the paper is handed in when time is up. Multiple choice is marked on the device; written answers are marked by the AI against a model answer. Results show the grade (A to F), a tick or cross per question, the correct answer, tips for missed questions, and "Explain this more" for a fuller explanation.
 - **Ask about this page.** Type a question, or ask about highlighted words. Answers are kept on the sheet.
 - **Explain this.** Select words on the page and press Explain for a plain-words breakdown.
 - **Offline queue.** A hard question asked offline is marked "Queued" and goes to the cloud by itself the moment the connection returns (or press "Answer on this laptop now"). The same happens to any request that can't run offline because the on-device model isn't available, or because you chose Cloud. The queue is saved on the device, so it survives a reload, and the top bar shows how many items are waiting.
@@ -85,6 +86,29 @@ Built for the [#BuildHybridAI 2026 hackathon](https://firebasehybridaihackathon.
      ```
    - `available` means ready. If it says `downloadable`, click **Download on-device model** in the app. Progress is also visible at `chrome://on-device-internals`.
 
+## Deploy to Firebase Hosting
+
+The hosted app is a static build (`dist/`) with a service worker, so it opens offline once it has been visited.
+
+1. **App Check for the hosted site.** Browsers outside your machine have no debug token, so the hosted build uses reCAPTCHA Enterprise (free up to 10,000 checks a month, no billing account needed):
+   - In the [Google Cloud console](https://console.cloud.google.com/security/recaptcha) for your Firebase project, create a **Website** key. Add your hosting domains (`<project-id>.web.app` and `<project-id>.firebaseapp.com`) and leave "Use checkbox challenge" off.
+   - In the Firebase console, go to **Security > App Check > Apps**, choose your web app, pick **reCAPTCHA Enterprise** and paste the key.
+   - Put the key in `.env` as `VITE_RECAPTCHA_ENTERPRISE_SITE_KEY`. It is a public site key, not a secret.
+2. **Sign in and choose the project** (once):
+
+   ```powershell
+   npx firebase login
+   npx firebase use --add
+   ```
+
+3. **Deploy:**
+
+   ```powershell
+   npm run deploy
+   ```
+
+   The app is then live at `https://<project-id>.web.app`.
+
 ## Scripts
 
 | Command | What it does |
@@ -93,6 +117,7 @@ Built for the [#BuildHybridAI 2026 hackathon](https://firebasehybridaihackathon.
 | `npm run build` | Type-check and build for production into `dist/` |
 | `npm run preview` | Serve the production build locally |
 | `npm run lint` | Lint with oxlint |
+| `npm run deploy` | Build and publish to Firebase Hosting |
 
 ## Project structure
 
@@ -115,6 +140,9 @@ src/
   ai/asks.ts              Questions about a page
   ai/quiz.ts              Quiz schema, parsing and validation
   ai/quizzes.ts           Writing and saving page quizzes
+  ai/examFormat.ts        Exam types, schemas for written questions and marking, grades
+  ai/exams.ts             Writing exams in batches, marking, explaining missed questions
+  screens/Exam.tsx        Exam setup, the timed paper, marking and results
   components/PdfPage.tsx  Rendered page, selectable text layer and highlights
   components/PageToolbar.tsx  Hide the page list, zoom and enlarge
   lib/readerPrefs.ts      Zoom and page list choices, remembered on the device

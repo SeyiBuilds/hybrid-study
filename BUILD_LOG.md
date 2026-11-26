@@ -13,21 +13,36 @@ Seyi used the app for a week as a student and wrote up what he wanted changed. W
 - **Formulas on their own lines, typeset.** Summaries and answers now put every formula or calculation step on its own line under the bullet it belongs to, typeset with KaTeX (fractions, powers, subscripts, Greek letters). Equations the model writes inline anyway, in backticks or single dollar signs, are lifted onto their own line too, and powers like 10^4 show as 10⁴. KaTeX is bundled with the app, so formulas render offline.
 - **Broken symbols repaired.** Text from the PDF no longer shows empty boxes: "VARIGNON□S" now reads "VARIGNON’S", and "w □ mg" reads "w = mg". Documents are re-read once on open to pick this up.
 - **Explanations show their working.** When an answer involves a calculation, the model is asked to show each step and say why it is done.
+- **Quiz settings.** Choose 5, 10 or 15 questions and Easy, Medium, Hard or Mixed before writing a page quiz. The choice is remembered.
+- **Exam mode.** "Exam mode" above the page opens a timed exam on the whole lecture note (or a page range):
+  - 20, 40 or 60 questions; multiple choice only, or multiple choice plus a written section (2, 4 or 6 theory questions); Easy, Medium, Hard or Mixed; 15 minutes to 2 hours.
+  - Past questions: add a past-paper PDF for the course and the new questions follow its style and difficulty without copying it. It stays on the laptop.
+  - Taking it: the notes close, a timer counts down, a numbered grid shows what is answered, and answers are saved as you go (a reload loses nothing). When time runs out the paper is handed in by itself.
+  - Marking: multiple choice is marked on the laptop at once; written answers are marked by the AI against a model answer and key points. Results show the grade (A to F, Nigerian university scale), marks per section, a green tick or red cross per question, the correct answer, a tip for each missed question, and feedback and a correction for written answers. "Explain this more" gives a fuller explanation with the working; "Missed" shows only the ones to revise; "Retake these questions" starts the same paper again.
+  - Past exams on a lecture note are listed with their grades.
+- **Installable, and opens offline.** The built app has a web manifest, icons and a service worker that saves the app shell, fonts, formula fonts and the PDF engine on the device (55 files, 3.6 MB). After one visit, the library and documents open with no connection at all. AI requests are never cached. When a new version is deployed, a small note offers "Reload" rather than reloading in the middle of an answer or an exam.
+- **Ready for Firebase Hosting.** `firebase.json` (with long caching for hashed files and none for the service worker), `npm run deploy`, robots.txt, sitemap.xml, a page description and sharing tags.
 - **Green and red marking.** Marked quizzes show a green tick and green answer for each question you got right, and a red cross with your wrong answer struck through in red. The circled score is green from half marks up.
 
 ### What broke
 - **Pages were hard to read in the app.** Textbook pages with formulas looked soft, there was no way to zoom, and the page list took space Seyi wanted for the page and the sheet.
 - **Formulas were unreadable.** In fluid mechanics and statics notes, summaries ran equations into sentences (`p1/rV1^2 + gz1`), showed backticks and carets, and some symbols came out as empty boxes.
+- **Quizzes were always five questions at one level,** and there was no way to practise under exam conditions.
 - **Installing the hosting tools failed** with "host unreachable" while the connection dropped. Retried later.
 
 ### What we changed and why
 - **Extra drawing density, with a ceiling.** The page canvas is drawn at 1.5 times the screen density (at least 2x) but kept under about 4,000 pixels wide, so zooming in doesn't eat memory on a 16 GB laptop.
 - **Why the boxes appeared:** many textbook PDFs store punctuation as old Windows codes (the apostrophe as U+0092) and maths symbols in the Symbol font's private character range (= as U+F03D, ρ as U+F072). No font can draw those, so they showed as boxes and the AI saw nonsense. They are now mapped back to the real characters when the text is extracted.
 - **LaTeX for summaries and answers, plain symbols for quizzes.** Summaries and answers are plain text, so LaTeX between $$ signs is safe and typesets well. Quiz questions come back as JSON, where LaTeX backslashes break the format, so quizzes use plain symbols such as ×, ², √ and V₁ instead.
+- **Exams are written in the cloud by default.** An exam is a "hard" task for the router: 40 or 60 questions would take many minutes on a laptop running Gemini Nano on its CPU, so with a connection they are written in the cloud in batches of 10, each from a different part of the notes, and the setup screen says roughly how much data that uses. Offline, it says so and offers to write the exam on the laptop instead. Choosing "This laptop" under Run AI on also keeps it local.
+- **Written answers are marked by the AI, objective ones are not.** Multiple choice has one right answer, so the laptop marks it instantly and for free. Written answers need judgement, so each is marked against the model answer and key points the exam was written with. If the connection drops while marking, the laptop marks the rest; finished marks are saved one by one.
+- **New formats get their own model pair.** Firebase AI Logic fixes the output schema per model instance, so written questions and marking each have an on-device and a cloud model with their own JSON schema, like quizzes.
 - **Marks in the colours students expect:** green for right, red for missed, keeping the drawn tick and cross rather than emoji.
 
 ### Still open
-- Quiz and exam settings, timed exam mode with past questions, diagrams in explanations, hosting.
+- Diagrams in explanations.
+- Going live: Seyi to create the reCAPTCHA Enterprise key and register it in App Check, and sign in to the Firebase CLI, then deploy. Then Google Search Console.
+- Seyi to try a real exam with the on-device model and the cloud on his own lecture notes.
 
 ## Sun 22 Nov 2026
 
