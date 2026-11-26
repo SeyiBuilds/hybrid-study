@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://fir-ai-hackathon-9162d.web.app/sitemap.xml

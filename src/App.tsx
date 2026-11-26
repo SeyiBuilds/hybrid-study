@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
 import { TopBar } from './components/TopBar'
+import { UpdatePrompt } from './components/UpdatePrompt'
 import { useConnectivity } from './lib/useConnectivity'
 import { useOnDeviceStartup } from './lib/useOnDeviceStartup'
 import { useQueueFlusher } from './lib/useQueueFlusher'
 import { routes, useHashRoute } from './lib/useHashRoute'
 import { Diagnostics } from './screens/Diagnostics'
+import { ExamScreen } from './screens/Exam'
 import { Library } from './screens/Library'
 import { Reader } from './screens/Reader'
 
@@ -18,7 +20,12 @@ export default function App() {
   const [docTitle, setDocTitle] = useState<string | null>(null)
 
   useEffect(() => {
-    document.title = route.name === 'reader' && docTitle ? `${docTitle} · Hybrid Study` : APP_TITLE
+    document.title =
+      route.name === 'reader' && docTitle
+        ? `${docTitle} · Hybrid Study`
+        : route.name === 'exam' && docTitle
+          ? `Exam: ${docTitle} · Hybrid Study`
+          : APP_TITLE
   }, [route.name, docTitle])
 
   useEffect(() => {
@@ -39,6 +46,12 @@ export default function App() {
                 <span className="truncate text-[0.9rem] font-[600]">{docTitle}</span>
               </>
             )}
+            {route.name === 'exam' && docTitle && (
+              <>
+                <span className="h-4 w-px shrink-0 bg-rule" aria-hidden />
+                <span className="truncate text-[0.9rem] font-[600]">Exam · {docTitle}</span>
+              </>
+            )}
           </>
         )}
       </TopBar>
@@ -47,7 +60,11 @@ export default function App() {
       {route.name === 'reader' && (
         <Reader id={route.id} page={route.page} onTitle={setDocTitle} connectivity={{ deviceStatus }} />
       )}
+      {route.name === 'exam' && (
+        <ExamScreen documentId={route.id} examId={route.examId} deviceStatus={deviceStatus} onTitle={setDocTitle} />
+      )}
       {route.name === 'diagnostics' && <Diagnostics online={online} deviceStatus={deviceStatus} refresh={refresh} />}
+      <UpdatePrompt />
     </>
   )
 }

@@ -11,8 +11,9 @@ dist-ssr/
 .env.*
 !.env.example
 
-# Firebase local state
+# Firebase local state (.firebaserc names your own project: run `npx firebase use --add`)
 .firebase/
+.firebaserc
 firebase-debug.log*
 firestore-debug.log*
 ui-debug.log*
