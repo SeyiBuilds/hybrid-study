@@ -7,8 +7,10 @@ What was built each day, what broke, and what we changed and why. Newest day fir
 Seyi used the app for a week as a student and wrote up what he wanted changed. Working through that list.
 
 ### Built
-- **Hide the page list.** A "Hide pages" button above the page gives the lecture note and the study sheet the room. The choice is remembered.
-- **Zoom and enlarge.** Zoom out and in (75% to 250% of the reading width) with the buttons or the + and - keys, and press the percentage to fit the width again. "Enlarge" lets the page fill the screen; Escape or "Back to study view" brings the sheet back. Zoomed pages scroll sideways inside the page area.
+- **Page list that folds away.** An icon in the top corner of the page list folds it to a thin rail (and back), giving the lecture note and the study sheet the room. The choice is remembered.
+- **One bar for the page.** Previous and next, the page number, zoom (75% to 250%, or the + and - keys; press the percentage to fit the width again) and enlarge sit together in one bar floating at the foot of the page. Enlarged, the page fills the screen; Escape brings the sheet back.
+- **Exam mode beside the document title** in the top bar, as a document-level action.
+- **One set of controls.** Run AI on, the quiz settings, exam setup and the results filter all use the same segmented switch.
 - **Sharper pages.** Pages are drawn at least twice the screen's pixel density, so small print and formulas in scanned textbooks stay readable.
 - **Formulas on their own lines, typeset.** Summaries and answers now put every formula or calculation step on its own line under the bullet it belongs to, typeset with KaTeX (fractions, powers, subscripts, Greek letters). Equations the model writes inline anyway, in backticks or single dollar signs, are lifted onto their own line too, and powers like 10^4 show as 10⁴. KaTeX is bundled with the app, so formulas render offline.
 - **Broken symbols repaired.** Text from the PDF no longer shows empty boxes: "VARIGNON□S" now reads "VARIGNON’S", and "w □ mg" reads "w = mg". Documents are re-read once on open to pick this up.
@@ -25,12 +27,16 @@ Seyi used the app for a week as a student and wrote up what he wanted changed. W
 - **Green and red marking.** Marked quizzes show a green tick and green answer for each question you got right, and a red cross with your wrong answer struck through in red. The circled score is green from half marks up.
 
 ### What broke
+- **Controls added "anywhere and anyhow".** The first version of these features put "Hide pages", "Exam mode", zoom and "Enlarge" in a row of labelled buttons above the page, and the quiz settings as loose words on the sheet. At Seyi's real screen size (1280 by 720 at 150% scaling) the labels wrapped and the row looked like an afterthought.
+- **Pages cut off at the bottom.** Making the page scroll sideways when zoomed also turned it into its own scroll box, which the layout squashed to the window height, so the bottom of every page was clipped.
 - **Pages were hard to read in the app.** Textbook pages with formulas looked soft, there was no way to zoom, and the page list took space Seyi wanted for the page and the sheet.
 - **Formulas were unreadable.** In fluid mechanics and statics notes, summaries ran equations into sentences (`p1/rV1^2 + gz1`), showed backticks and carets, and some symbols came out as empty boxes.
 - **Quizzes were always five questions at one level,** and there was no way to practise under exam conditions.
 - **Installing the hosting tools failed** with "host unreachable" while the connection dropped. Retried later.
 
 ### What we changed and why
+- **Controls grouped by what they act on:** page tools in one bar on the page, the page list's toggle on the page list, the exam (which is about the whole document) next to the document's title, and quiz options only shown before writing questions. Checked in screenshots at 1280 by 720 and on a phone.
+- **The page box takes its full height** and the page area scrolls instead; sideways scrolling is only switched on when zoomed in.
 - **Extra drawing density, with a ceiling.** The page canvas is drawn at 1.5 times the screen density (at least 2x) but kept under about 4,000 pixels wide, so zooming in doesn't eat memory on a 16 GB laptop.
 - **Why the boxes appeared:** many textbook PDFs store punctuation as old Windows codes (the apostrophe as U+0092) and maths symbols in the Symbol font's private character range (= as U+F03D, ρ as U+F072). No font can draw those, so they showed as boxes and the AI saw nonsense. They are now mapped back to the real characters when the text is extracted.
 - **LaTeX for summaries and answers, plain symbols for quizzes.** Summaries and answers are plain text, so LaTeX between $$ signs is safe and typesets well. Quiz questions come back as JSON, where LaTeX backslashes break the format, so quizzes use plain symbols such as ×, ², √ and V₁ instead.

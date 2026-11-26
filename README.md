@@ -9,7 +9,7 @@ Built for the [#BuildHybridAI 2026 hackathon](https://firebasehybridaihackathon.
 ## Features
 
 - **PDF reader.** Open or drop a PDF and read it page by page. Running headers, footers and page numbers are stripped from the text the AI reads, and paragraphs, headings, lists and contents entries are rebuilt. Pages that are scanned images are flagged.
-- **Comfortable reading.** Hide the page list, zoom from 75% to 250% (or press + and -), or enlarge the page to fill the screen. Pages are drawn at extra density so small print and formulas stay sharp.
+- **Comfortable reading.** One bar at the foot of the page turns pages, zooms from 75% to 250% (or press + and -) and enlarges the page to fill the screen. The page list folds away to a thin rail from the icon in its corner. Pages are drawn at extra density so small print and formulas stay sharp.
 - **Highlight on the page.** Select words on the PDF itself and mark them with a yellow, green or pink highlighter. Click a highlight to recolour it, add a note, ask about it or remove it.
 - **A study sheet for every page.** A ruled sheet beside the page with four tabs: Summary, Ask, Quiz and Notes (your own notes in "blue biro" and the page's highlights with their notes). Summaries can be edited into your own words. A tab shows a dot while something behind it is working or waiting.
 - **Formulas that read like a textbook.** Formulas and calculation steps go on their own lines under the point they belong to, typeset with KaTeX (fractions, powers, subscripts, Greek letters). Symbols that PDFs store in old encodings, which usually show as empty boxes, are repaired when the text is read.
@@ -144,7 +144,9 @@ src/
   ai/exams.ts             Writing exams in batches, marking, explaining missed questions
   screens/Exam.tsx        Exam setup, the timed paper, marking and results
   components/PdfPage.tsx  Rendered page, selectable text layer and highlights
-  components/PageToolbar.tsx  Hide the page list, zoom and enlarge
+  components/ReaderBar.tsx    Page turning, zoom and enlarge, in one bar under the page
+  components/controls.tsx     Shared segmented switch and icon buttons
+  components/icons.tsx        Line icons
   lib/readerPrefs.ts      Zoom and page list choices, remembered on the device
   components/MarkToolbar.tsx     Highlighter colours, note and ask over a selection
   components/SummarySection.tsx  Summary on the study sheet, editable
