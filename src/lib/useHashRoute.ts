@@ -4,12 +4,15 @@ export type Route =
   | { name: 'library' }
   | { name: 'reader'; id: string; page: number | null }
   | { name: 'diagnostics' }
+  | { name: 'exam'; id: string; examId: string | null }
 
 function parse(hash: string): Route {
   const path = hash.replace(/^#\/?/, '')
   if (path === 'diagnostics') return { name: 'diagnostics' }
   const reader = path.match(/^doc\/([a-f0-9]+)(?:\/(\d+))?$/)
   if (reader) return { name: 'reader', id: reader[1], page: reader[2] ? Number(reader[2]) : null }
+  const exam = path.match(/^exam\/([a-f0-9]+)(?:\/([a-z0-9-]+))?$/)
+  if (exam) return { name: 'exam', id: exam[1], examId: exam[2] ?? null }
   return { name: 'library' }
 }
 
@@ -17,6 +20,7 @@ export const routes = {
   library: '#/',
   diagnostics: '#/diagnostics',
   reader: (id: string, page?: number) => (page ? `#/doc/${id}/${page}` : `#/doc/${id}`),
+  exam: (id: string, examId?: string) => (examId ? `#/exam/${id}/${examId}` : `#/exam/${id}`),
 }
 
 /** Tiny hash router: works on static hosting and offline without server rewrites. */

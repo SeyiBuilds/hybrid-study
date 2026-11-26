@@ -33,7 +33,7 @@ import { logRoute } from './routeLog'
 import { recordUsage } from '../lib/dataLedger'
 import { markCloudReachable, markCloudUnreachable, readNetwork, type NetworkState } from '../lib/network'
 
-export type Task = 'summarise' | 'ask' | 'quiz' | 'connection-test' | 'speed-check'
+export type Task = 'summarise' | 'ask' | 'quiz' | 'exam' | 'marking' | 'connection-test' | 'speed-check'
 
 /** Tasks that measure or test the models rather than help the student; not counted as data saved. */
 const SYSTEM_TASKS: Task[] = ['connection-test', 'speed-check']

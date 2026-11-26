@@ -8,7 +8,18 @@ import { BadOutputError } from './errors'
 import type { PageText } from '../lib/pageText'
 
 export const QUESTION_COUNT = 5
+/** Sizes a student can choose for a page quiz. */
+export const QUIZ_SIZES = [5, 10, 15]
+const MAX_QUESTIONS = 20
 const MIN_USABLE_QUESTIONS = 3
+
+export type QuizLevel = 'easy' | 'medium' | 'hard' | 'mixed'
+export const QUIZ_LEVELS: Array<{ id: QuizLevel; label: string }> = [
+  { id: 'easy', label: 'Easy' },
+  { id: 'medium', label: 'Medium' },
+  { id: 'hard', label: 'Hard' },
+  { id: 'mixed', label: 'Mixed' },
+]
 const OPTION_COUNT = 4
 const LETTERS = ['A', 'B', 'C', 'D']
 
@@ -21,21 +32,25 @@ export interface QuizQuestion {
   /** Index of the correct option. */
   correct: number
   explanation: string
+  /** A short trick for remembering or solving this kind of question (exams). */
+  tip?: string
 }
 
 /** Passed as `responseConstraint` on-device and `responseSchema` in the cloud. */
 export const quizSchema = Schema.object({
   properties: {
     questions: Schema.array({
-      minItems: QUESTION_COUNT,
-      maxItems: QUESTION_COUNT,
+      minItems: 1,
+      maxItems: MAX_QUESTIONS,
       items: Schema.object({
         properties: {
           question: Schema.string(),
           options: Schema.array({ items: Schema.string(), minItems: OPTION_COUNT, maxItems: OPTION_COUNT }),
           answer: Schema.enumString({ enum: LETTERS }),
           explanation: Schema.string(),
+          tip: Schema.string(),
         },
+        optionalProperties: ['tip'],
       }),
     }),
   },
@@ -99,7 +114,12 @@ function shuffled(question: QuizQuestion, random: () => number): QuizQuestion {
  * the whole reply is rejected if too few remain. Options are shuffled because small
  * models tend to put the right answer first.
  */
-export function parseQuiz(text: string, random: () => number = Math.random): QuizQuestion[] {
+export function parseQuiz(
+  text: string,
+  random: () => number = Math.random,
+  count: number = QUESTION_COUNT,
+  minUsable: number = Math.min(MIN_USABLE_QUESTIONS, count),
+): QuizQuestion[] {
   const data = extractJson(text) as { questions?: unknown }
   const raw = Array.isArray(data.questions) ? data.questions : []
   const seen = new Set<string>()
@@ -115,11 +135,12 @@ export function parseQuiz(text: string, random: () => number = Math.random): Qui
     if (options.length !== OPTION_COUNT || options.some((option) => !option) || distinct.size !== OPTION_COUNT) continue
     if (correct < 0 || correct >= OPTION_COUNT) continue
     seen.add(key)
-    questions.push(shuffled({ question, options, correct, explanation: cleanText(item?.explanation) }, random))
+    const tip = cleanText(item?.tip)
+    questions.push(shuffled({ question, options, correct, explanation: cleanText(item?.explanation), ...(tip ? { tip } : {}) }, random))
   }
 
-  if (questions.length < MIN_USABLE_QUESTIONS) {
+  if (questions.length < minUsable) {
     throw new BadOutputError('The AI could not write usable questions for this page. Try again.')
   }
-  return questions.slice(0, QUESTION_COUNT)
+  return questions.slice(0, count)
 }

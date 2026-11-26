@@ -4,7 +4,8 @@
  * only rewrites a few bytes. Nothing here leaves the browser.
  */
 import type { PageText } from './pdf'
-import type { QuizQuestion } from '../ai/quiz'
+import type { Exam } from '../ai/examFormat'
+import type { QuizLevel, QuizQuestion } from '../ai/quiz'
 
 export interface DocumentSummary {
   id: string
@@ -84,6 +85,8 @@ export interface PageQuiz {
   answers: Array<number | null>
   checkedAt: number | null
   score: number | null
+  /** The difficulty the questions were written at (older quizzes: not recorded). */
+  level?: QuizLevel
   /** Every marked attempt at these questions. */
   scores: number[]
   source: 'on_device' | 'in_cloud'
@@ -107,8 +110,17 @@ export interface PageAnswer {
   createdAt: number
 }
 
+/** Past exam questions for a course, read from a PDF the student added. */
+export interface PastQuestions {
+  documentId: string
+  fileName: string
+  pages: number
+  text: string
+  addedAt: number
+}
+
 const DB_NAME = 'hybrid-study'
-const DB_VERSION = 4
+const DB_VERSION = 5
 const META = 'documents'
 const CONTENT = 'documentContent'
 const SUMMARIES = 'summaries'
@@ -116,6 +128,8 @@ const HIGHLIGHTS = 'highlights'
 const NOTES = 'notes'
 const ANSWERS = 'answers'
 const QUIZZES = 'quizzes'
+const EXAMS = 'exams'
+const PAST = 'pastQuestions'
 /** Stores holding per-page study material, each indexed by documentId and docPage. */
 const PAGE_STORES = [SUMMARIES, HIGHLIGHTS, NOTES, ANSWERS, QUIZZES]
 
@@ -139,6 +153,8 @@ function openDb(): Promise<IDBDatabase> {
       ensure(NOTES, 'key')
       ensure(ANSWERS, 'id')
       ensure(QUIZZES, 'key')
+      if (!db.objectStoreNames.contains(EXAMS)) db.createObjectStore(EXAMS, { keyPath: 'id' }).createIndex('documentId', 'documentId')
+      if (!db.objectStoreNames.contains(PAST)) db.createObjectStore(PAST, { keyPath: 'documentId' })
     }
     request.onsuccess = () => {
       const db = request.result
@@ -206,10 +222,11 @@ export async function listDocuments(): Promise<DocumentSummary[]> {
 /** Removes a document and everything written about it (summaries, highlights, notes, answers). */
 export async function deleteDocument(id: string): Promise<void> {
   const db = await openDb()
-  const tx = db.transaction([META, CONTENT, ...PAGE_STORES], 'readwrite')
+  const tx = db.transaction([META, CONTENT, PAST, ...PAGE_STORES, EXAMS], 'readwrite')
   tx.objectStore(META).delete(id)
   tx.objectStore(CONTENT).delete(id)
-  for (const name of PAGE_STORES) {
+  tx.objectStore(PAST).delete(id)
+  for (const name of [...PAGE_STORES, EXAMS]) {
     const store = tx.objectStore(name)
     store.index('documentId').openKeyCursor(IDBKeyRange.only(id)).onsuccess = (event) => {
       const cursor = (event.target as IDBRequest<IDBCursor | null>).result
@@ -318,4 +335,39 @@ export function saveAnswer(answer: PageAnswer): Promise<PageAnswer> {
 
 export function deleteAnswer(id: string): Promise<void> {
   return remove(ANSWERS, id)
+}
+
+export function saveExam(exam: Exam): Promise<Exam> {
+  return put(EXAMS, exam)
+}
+
+export async function getExam(id: string): Promise<Exam | undefined> {
+  const db = await openDb()
+  return promisify(db.transaction(EXAMS).objectStore(EXAMS).get(id) as IDBRequest<Exam | undefined>)
+}
+
+/** Exams on a document, newest first. */
+export async function listExams(documentId: string): Promise<Exam[]> {
+  const db = await openDb()
+  const all = await promisify(
+    db.transaction(EXAMS).objectStore(EXAMS).index('documentId').getAll(documentId) as IDBRequest<Exam[]>,
+  )
+  return all.sort((a, b) => b.createdAt - a.createdAt)
+}
+
+export function deleteExam(id: string): Promise<void> {
+  return remove(EXAMS, id)
+}
+
+export async function getPastQuestions(documentId: string): Promise<PastQuestions | undefined> {
+  const db = await openDb()
+  return promisify(db.transaction(PAST).objectStore(PAST).get(documentId) as IDBRequest<PastQuestions | undefined>)
+}
+
+export function savePastQuestions(past: PastQuestions): Promise<PastQuestions> {
+  return put(PAST, past)
+}
+
+export function deletePastQuestions(documentId: string): Promise<void> {
+  return remove(PAST, documentId)
 }

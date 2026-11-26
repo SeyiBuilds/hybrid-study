@@ -75,3 +75,27 @@ export async function importPdf(file: File, onProgress: (progress: ImportProgres
     void closePdf(pdf)
   }
 }
+
+/** Reads the text of a PDF (such as past questions) without adding it to the library. */
+export async function readPdfText(file: File): Promise<{ text: string; pages: number }> {
+  const looksLikePdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name)
+  if (!looksLikePdf) throw new ImportError(`${file.name} is not a PDF. Choose a .pdf file.`)
+  if (file.size > MAX_PDF_BYTES) throw new ImportError(`${file.name} is larger than 60 MB.`)
+  let pdf
+  try {
+    pdf = await openPdf(await file.arrayBuffer())
+  } catch {
+    throw new ImportError(`${file.name} could not be read as a PDF.`)
+  }
+  try {
+    const pages = await extractPages(pdf, () => {})
+    const text = pages
+      .filter(hasUsableText)
+      .map((page) => page.text)
+      .join('\n\n')
+    if (!text.trim()) throw new ImportError(`${file.name} has no selectable text. It may be a scan.`)
+    return { text, pages: pages.length }
+  } finally {
+    void closePdf(pdf)
+  }
+}

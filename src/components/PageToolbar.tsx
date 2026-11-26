@@ -24,6 +24,15 @@ function EnlargeIcon({ enlarged }: { enlarged: boolean }) {
   )
 }
 
+function ExamIcon() {
+  return (
+    <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden>
+      <circle cx="10" cy="11" r="6.5" />
+      <path d="M10 7.5V11l2.5 1.5M8 2.5h4" />
+    </svg>
+  )
+}
+
 /** Above the page: show or hide the page list, zoom, and enlarge the page to fill the screen. */
 export function PageToolbar({
   pagesOpen,
@@ -32,7 +41,10 @@ export function PageToolbar({
   onZoom,
   enlarged,
   onToggleEnlarged,
+  examHref,
 }: {
+  /** Link to exam mode for this document. */
+  examHref: string
   pagesOpen: boolean
   onTogglePages: () => void
   zoom: number
@@ -49,6 +61,10 @@ export function PageToolbar({
           {pagesOpen ? 'Hide pages' : 'Show pages'}
         </button>
       )}
+      <a href={examHref} className={toolButton}>
+        <ExamIcon />
+        Exam mode
+      </a>
       <div className="ml-auto flex items-center rounded-full border border-rule bg-sheet/60 p-[3px]" role="group" aria-label="Zoom">
         <button
           type="button"

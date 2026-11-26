@@ -35,3 +35,33 @@ export function useZoom(): [number, (zoom: number) => void] {
 export function usePagesPane(): [boolean, (open: boolean) => void] {
   return usePersisted('hybrid-study:pages-pane', true, (value) => typeof value === 'boolean')
 }
+
+export interface QuizSettings {
+  count: number
+  level: 'easy' | 'medium' | 'hard' | 'mixed'
+}
+
+const LEVELS = ['easy', 'medium', 'hard', 'mixed']
+
+/** The size and difficulty of page quizzes, remembered between pages. */
+export function useQuizSettings(): [QuizSettings, (settings: QuizSettings) => void] {
+  return usePersisted<QuizSettings>('hybrid-study:quiz-settings', { count: 5, level: 'mixed' }, (value) => {
+    const settings = value as QuizSettings | null
+    return !!settings && [5, 10, 15].includes(settings.count) && LEVELS.includes(settings.level)
+  })
+}
+
+export interface ExamPrefs {
+  count: number
+  written: boolean
+  level: 'easy' | 'medium' | 'hard' | 'mixed'
+  minutes: number
+}
+
+/** The last exam setup, so the next exam starts from the same choices. */
+export function useExamPrefs(): [ExamPrefs, (prefs: ExamPrefs) => void] {
+  return usePersisted<ExamPrefs>('hybrid-study:exam-prefs', { count: 40, written: true, level: 'mixed', minutes: 60 }, (value) => {
+    const prefs = value as ExamPrefs | null
+    return !!prefs && [20, 40, 60].includes(prefs.count) && typeof prefs.written === 'boolean' && LEVELS.includes(prefs.level) && prefs.minutes > 0
+  })
+}

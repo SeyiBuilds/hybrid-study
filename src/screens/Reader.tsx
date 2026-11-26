@@ -498,6 +498,7 @@ function ReaderView({
         aria-label="Page view"
       >
         <PageToolbar
+          examHref={routes.exam(summary.id)}
           pagesOpen={pagesOpen}
           onTogglePages={() => setPagesOpen(!pagesOpen)}
           zoom={zoom}

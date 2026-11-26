@@ -2,6 +2,7 @@
  * Prompts sent to the models. Kept short and single-turn so they suit Gemini Nano
  * (on-device limit: 9216 tokens) as well as the cloud model.
  */
+import type { QuizLevel } from './quiz'
 import { ROUTER_DEFAULTS } from './routerConfig'
 import type { PageText } from '../lib/pageText'
 
@@ -71,15 +72,37 @@ export function askPrompt({
   ].join('\n')
 }
 
-export function quizPrompt({ pageText, title, page }: { pageText: string; title: string; page: number }): string {
+const LEVEL_RULES: Record<QuizLevel, string> = {
+  easy: 'Make the questions easy: recall of definitions, terms and facts stated in the notes.',
+  medium: 'Make the questions medium difficulty: test understanding and simple application, not just recall.',
+  hard: 'Make the questions hard: multi-step reasoning, applying formulas to new numbers, comparing ideas and spotting subtle differences. Wrong options should be common mistakes.',
+  mixed: 'Mix the difficulty: about a third easy recall, a third testing understanding, and a third hard application or calculation.',
+}
+
+const PLAIN_FORMULAS = 'Write formulas in plain text with symbols such as ×, ÷, ², ³, √, ρ, Σ and subscripts like V₁. Do not use LaTeX.'
+
+export function quizPrompt({
+  pageText,
+  title,
+  page,
+  count = 5,
+  level = 'mixed',
+}: {
+  pageText: string
+  title: string
+  page: number
+  count?: number
+  level?: QuizLevel
+}): string {
   return [
     'You write exam practice questions for a university student from their lecture notes.',
-    'Write exactly 5 multiple-choice questions that test understanding of the page below.',
+    `Write exactly ${count} multiple-choice questions that test understanding of the page below.`,
+    LEVEL_RULES[level],
     '- Use only facts stated on the page.',
     '- Give each question 4 short options. Exactly one is correct; the other three must be believable but wrong according to the page.',
     '- "answer" is the letter of the correct option: A, B, C or D.',
     '- "explanation" is one short sentence saying why that answer is correct.',
-    '- Write formulas in plain text with symbols such as ×, ÷, ², ³, √, ρ, Σ and subscripts like V₁. Do not use LaTeX.',
+    `- ${PLAIN_FORMULAS}`,
     '- Do not ask about page numbers, headings or the course title.',
     'Reply with JSON only.',
     '',
@@ -104,6 +127,162 @@ export function summarisePrompt({ pageText, title, page }: { pageText: string; t
     'Page text:',
     '"""',
     trimPage(pageText),
+    '"""',
+  ].join('\n')
+}
+
+function pastQuestionsBlock(past?: string): string[] {
+  if (!past) return []
+  return [
+    'Past exam questions for this course are below. Match their style, structure, wording and difficulty, but write NEW questions about the notes. Never copy a past question.',
+    '"""',
+    past,
+    '"""',
+    '',
+  ]
+}
+
+/** One batch of objective questions for a timed exam. */
+export function examMcqPrompt({
+  notes,
+  title,
+  count,
+  level,
+  past,
+  avoid,
+}: {
+  notes: string
+  title: string
+  count: number
+  level: QuizLevel
+  past?: string
+  /** Questions already in the exam, so this batch doesn't repeat them. */
+  avoid: string[]
+}): string {
+  return [
+    'You set university exam questions from a student\'s lecture notes.',
+    `Write exactly ${count} multiple-choice questions on the notes below.`,
+    `- ${LEVEL_RULES[level]}`,
+    '- Cover different parts of the notes. Do not ask about page numbers, headings or the course title.',
+    '- Give each question 4 options. Exactly one is correct; the other three must be believable but wrong, such as common mistakes.',
+    '- For calculation questions, change the numbers from the worked examples so the student has to work it out.',
+    '- "answer" is the letter of the correct option: A, B, C or D.',
+    '- "explanation" is one or two sentences on why the answer is correct, with the working for calculations.',
+    '- "tip" is one short tip or trick that helps remember or solve this kind of question.',
+    `- ${PLAIN_FORMULAS}`,
+    ...(avoid.length ? ['- Do not repeat these questions:', ...avoid.slice(-30).map((q) => `  * ${q.slice(0, 120)}`)] : []),
+    'Reply with JSON only.',
+    '',
+    ...pastQuestionsBlock(past),
+    `Notes: ${title}`,
+    'Notes text:',
+    '"""',
+    notes,
+    '"""',
+  ].join('\n')
+}
+
+/** The written (theory) section of a timed exam. */
+export function examWrittenPrompt({
+  notes,
+  title,
+  count,
+  level,
+  past,
+}: {
+  notes: string
+  title: string
+  count: number
+  level: QuizLevel
+  past?: string
+}): string {
+  return [
+    'You set the theory section of a university exam from a student\'s lecture notes.',
+    `Write exactly ${count} written questions on the notes below.`,
+    `- ${LEVEL_RULES[level]}`,
+    '- Each question should need a short explanation, a derivation or a worked calculation, from a few lines to half a page.',
+    '- "marks" is what the question is worth, from 5 to 10.',
+    '- "modelAnswer" is a complete answer a lecturer would accept, with the working for calculations.',
+    '- "keyPoints" lists the 3 to 6 points a marker should look for.',
+    `- ${PLAIN_FORMULAS}`,
+    'Reply with JSON only.',
+    '',
+    ...pastQuestionsBlock(past),
+    `Notes: ${title}`,
+    'Notes text:',
+    '"""',
+    notes,
+    '"""',
+  ].join('\n')
+}
+
+/** Marking one written answer against the model answer. */
+export function markWrittenPrompt({
+  question,
+  marks,
+  modelAnswer,
+  keyPoints,
+  answer,
+}: {
+  question: string
+  marks: number
+  modelAnswer: string
+  keyPoints: string[]
+  answer: string
+}): string {
+  return [
+    'You are a fair university examiner marking one written answer.',
+    `Question (${marks} marks): ${question}`,
+    `Model answer: ${modelAnswer}`,
+    ...(keyPoints.length ? ['Points to look for:', ...keyPoints.map((point) => `- ${point}`)] : []),
+    '',
+    'Student\'s answer:',
+    '"""',
+    answer.slice(0, 4000),
+    '"""',
+    '',
+    `Give marks for each correct point, even if it is worded differently. Give 0 if the answer is blank or unrelated.`,
+    `- "score" is the marks awarded, a whole number from 0 to ${marks}.`,
+    '- "feedback" is one or two sentences to the student: what they got right and what was missing.',
+    '- "correction" is the correct answer in brief, with the working for calculations.',
+    '- "tip" is one short tip for answering this kind of question in an exam.',
+    `- ${PLAIN_FORMULAS}`,
+    'Reply with JSON only.',
+  ].join('\n')
+}
+
+/** A longer explanation of an exam question the student asked about after marking. */
+export function explainExamPrompt({
+  question,
+  options,
+  correct,
+  given,
+  notes,
+}: {
+  question: string
+  /** Lettered options for objective questions. */
+  options?: string[]
+  /** The right answer, as text. */
+  correct: string
+  /** What the student answered, as text, or empty. */
+  given: string
+  notes: string
+}): string {
+  return [
+    'You are a patient tutor helping a university student understand an exam question they got wrong.',
+    `Question: ${question}`,
+    ...(options ? options.map((option, index) => `${'ABCD'[index]}. ${option}`) : []),
+    `Correct answer: ${correct}`,
+    `Student's answer: ${given || '(no answer)'}`,
+    '',
+    'Explain in simple words why the correct answer is right and where the student probably went wrong.',
+    'If it involves a calculation, show each step and say why it is done, and give any tip or shortcut that makes it easier.',
+    'At most 180 words. Use short bullet points starting with "- " where they help.',
+    FORMULA_RULE,
+    '',
+    'Relevant notes:',
+    '"""',
+    trimPage(notes),
     '"""',
   ].join('\n')
 }

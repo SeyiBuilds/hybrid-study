@@ -14,6 +14,7 @@ import {
   InferenceSource,
   type LanguageModelCreateOptions,
 } from 'firebase/ai'
+import { markingSchema, writtenSchema } from './examFormat'
 import { quizSchema } from './quiz'
 import { ROUTER_DEFAULTS } from './routerConfig'
 import { app } from '../firebase'
@@ -21,7 +22,7 @@ import { app } from '../firebase'
 export type Target = 'on_device' | 'in_cloud'
 
 /** What the model should return. Configuration is fixed per model, so each format has its own pair. */
-export type OutputFormat = 'text' | 'quiz'
+export type OutputFormat = 'text' | 'quiz' | 'written' | 'marking'
 
 /** Status of Chrome's built-in model, plus 'unsupported' when the Prompt API is missing entirely. */
 export type OnDeviceStatus = 'available' | 'downloadable' | 'downloading' | 'unavailable' | 'unsupported'
@@ -40,43 +41,41 @@ const onDeviceCreateOptions: LanguageModelCreateOptions = {
 
 const ai = getAI(app, { backend: new GoogleAIBackend() })
 
-const onDeviceModel = getGenerativeModel(ai, {
-  mode: InferenceMode.ONLY_ON_DEVICE,
-  onDeviceParams: { createOptions: onDeviceCreateOptions },
-})
-
 /** Fail a dead connection quickly instead of waiting for the SDK's 3-minute default. */
 const cloudRequestOptions = { timeout: ROUTER_DEFAULTS.cloudTimeoutMs }
 
-const cloudModel = getGenerativeModel(
-  ai,
-  { mode: InferenceMode.ONLY_IN_CLOUD, inCloudParams: { model: CLOUD_MODEL } },
-  cloudRequestOptions,
-)
+/**
+ * One model pinned on-device and one pinned to the cloud. With a schema, both must reply
+ * in that JSON shape: `responseConstraint` on-device, `responseSchema` in the cloud.
+ */
+function modelPair(schema?: typeof quizSchema) {
+  return {
+    on_device: getGenerativeModel(ai, {
+      mode: InferenceMode.ONLY_ON_DEVICE,
+      onDeviceParams: {
+        createOptions: onDeviceCreateOptions,
+        ...(schema ? { promptOptions: { responseConstraint: schema } } : {}),
+      },
+    }),
+    in_cloud: getGenerativeModel(
+      ai,
+      {
+        mode: InferenceMode.ONLY_IN_CLOUD,
+        inCloudParams: {
+          model: CLOUD_MODEL,
+          ...(schema ? { generationConfig: { responseMimeType: 'application/json', responseSchema: schema } } : {}),
+        },
+      },
+      cloudRequestOptions,
+    ),
+  }
+}
 
-const quizOnDeviceModel = getGenerativeModel(ai, {
-  mode: InferenceMode.ONLY_ON_DEVICE,
-  onDeviceParams: {
-    createOptions: onDeviceCreateOptions,
-    promptOptions: { responseConstraint: quizSchema },
-  },
-})
-
-const quizCloudModel = getGenerativeModel(
-  ai,
-  {
-    mode: InferenceMode.ONLY_IN_CLOUD,
-    inCloudParams: {
-      model: CLOUD_MODEL,
-      generationConfig: { responseMimeType: 'application/json', responseSchema: quizSchema },
-    },
-  },
-  cloudRequestOptions,
-)
-
-const models = {
-  text: { on_device: onDeviceModel, in_cloud: cloudModel },
-  quiz: { on_device: quizOnDeviceModel, in_cloud: quizCloudModel },
+const models: Record<OutputFormat, ReturnType<typeof modelPair>> = {
+  text: modelPair(),
+  quiz: modelPair(quizSchema),
+  written: modelPair(writtenSchema),
+  marking: modelPair(markingSchema),
 }
 
 /** Minimal shape of Chrome's global `LanguageModel`, used only for availability checks. */
@@ -128,7 +127,7 @@ export async function getOnDeviceStatus(): Promise<OnDeviceStatus> {
  * Resolves once the download has been requested; progress arrives through the callback (0 to 1).
  */
 export function startOnDeviceDownload(onProgress: (fraction: number) => void): Promise<void> {
-  return onDeviceModel.initializeDeviceModel(onProgress)
+  return models.text.on_device.initializeDeviceModel(onProgress)
 }
 
 /** Thrown when an on-device request is made before the model is ready. */

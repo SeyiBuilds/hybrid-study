@@ -269,6 +269,8 @@ const TASK_LABELS: Record<Task, string> = {
   summarise: 'Summary',
   ask: 'Question',
   quiz: 'Quiz',
+  exam: 'Exam questions',
+  marking: 'Exam marking',
   'connection-test': 'Connection test',
   'speed-check': 'Speed check',
 }
