@@ -12,6 +12,7 @@ Built for the [#BuildHybridAI 2026 hackathon](https://firebasehybridaihackathon.
 - **Comfortable reading.** Hide the page list, zoom from 75% to 250% (or press + and -), or enlarge the page to fill the screen. Pages are drawn at extra density so small print and formulas stay sharp.
 - **Highlight on the page.** Select words on the PDF itself and mark them with a yellow, green or pink highlighter. Click a highlight to recolour it, add a note, ask about it or remove it.
 - **A study sheet for every page.** A ruled sheet beside the page with four tabs: Summary, Ask, Quiz and Notes (your own notes in "blue biro" and the page's highlights with their notes). Summaries can be edited into your own words. A tab shows a dot while something behind it is working or waiting.
+- **Formulas that read like a textbook.** Formulas and calculation steps go on their own lines under the point they belong to, typeset with KaTeX (fractions, powers, subscripts, Greek letters). Symbols that PDFs store in old encodings, which usually show as empty boxes, are repaired when the text is read.
 - **Summarise a page.** 3 to 5 bullets, shown whole when ready. Every answer carries a badge with where it ran, how long it took and roughly how much data it used, for example "This laptop · 6.1 s · no data used".
 - **Quiz me.** Five multiple-choice questions from the page. Choose your answers, then the sheet marks them like a script: a green tick or red cross in the margin, the right answer in green, a circled score and a short explanation for each question. Quizzes and scores are saved on the device.
 - **Ask about this page.** Type a question, or ask about highlighted words. Answers are kept on the sheet.
@@ -126,6 +127,8 @@ src/
   components/SheetTabs.tsx  Summary, Ask, Quiz and Notes tabs on the study sheet
   lib/sheetTab.ts         The open tab, and what is working or queued behind each one
   lib/pageText.ts         Header/footer removal and paragraph, heading and list rebuilding
+  lib/symbols.ts          Repairs symbols PDFs store in old encodings (the empty boxes)
+  components/RichText.tsx Formulas typeset with KaTeX, powers and bold in model text
   lib/highlights.ts       Turning a selection into page-relative highlight rectangles
   lib/runOn.ts            The student's Run AI on choice
   firebase.ts             Firebase app + App Check
@@ -140,7 +143,7 @@ src/
 
 ## Tech stack
 
-Vite, React, TypeScript, Tailwind CSS, Firebase JS SDK (`firebase/ai`, App Check), pdf.js. Fonts (Archivo, Literata) are self-hosted from the build, and nothing loads from third-party CDNs.
+Vite, React, TypeScript, Tailwind CSS, Firebase JS SDK (`firebase/ai`, App Check), pdf.js, KaTeX. Fonts (Archivo, Literata) are self-hosted from the build, and nothing loads from third-party CDNs.
 
 ## License
 

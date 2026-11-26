@@ -10,18 +10,24 @@ Seyi used the app for a week as a student and wrote up what he wanted changed. W
 - **Hide the page list.** A "Hide pages" button above the page gives the lecture note and the study sheet the room. The choice is remembered.
 - **Zoom and enlarge.** Zoom out and in (75% to 250% of the reading width) with the buttons or the + and - keys, and press the percentage to fit the width again. "Enlarge" lets the page fill the screen; Escape or "Back to study view" brings the sheet back. Zoomed pages scroll sideways inside the page area.
 - **Sharper pages.** Pages are drawn at least twice the screen's pixel density, so small print and formulas in scanned textbooks stay readable.
+- **Formulas on their own lines, typeset.** Summaries and answers now put every formula or calculation step on its own line under the bullet it belongs to, typeset with KaTeX (fractions, powers, subscripts, Greek letters). Equations the model writes inline anyway, in backticks or single dollar signs, are lifted onto their own line too, and powers like 10^4 show as 10⁴. KaTeX is bundled with the app, so formulas render offline.
+- **Broken symbols repaired.** Text from the PDF no longer shows empty boxes: "VARIGNON□S" now reads "VARIGNON’S", and "w □ mg" reads "w = mg". Documents are re-read once on open to pick this up.
+- **Explanations show their working.** When an answer involves a calculation, the model is asked to show each step and say why it is done.
 - **Green and red marking.** Marked quizzes show a green tick and green answer for each question you got right, and a red cross with your wrong answer struck through in red. The circled score is green from half marks up.
 
 ### What broke
 - **Pages were hard to read in the app.** Textbook pages with formulas looked soft, there was no way to zoom, and the page list took space Seyi wanted for the page and the sheet.
+- **Formulas were unreadable.** In fluid mechanics and statics notes, summaries ran equations into sentences (`p1/rV1^2 + gz1`), showed backticks and carets, and some symbols came out as empty boxes.
 - **Installing the hosting tools failed** with "host unreachable" while the connection dropped. Retried later.
 
 ### What we changed and why
 - **Extra drawing density, with a ceiling.** The page canvas is drawn at 1.5 times the screen density (at least 2x) but kept under about 4,000 pixels wide, so zooming in doesn't eat memory on a 16 GB laptop.
+- **Why the boxes appeared:** many textbook PDFs store punctuation as old Windows codes (the apostrophe as U+0092) and maths symbols in the Symbol font's private character range (= as U+F03D, ρ as U+F072). No font can draw those, so they showed as boxes and the AI saw nonsense. They are now mapped back to the real characters when the text is extracted.
+- **LaTeX for summaries and answers, plain symbols for quizzes.** Summaries and answers are plain text, so LaTeX between $$ signs is safe and typesets well. Quiz questions come back as JSON, where LaTeX backslashes break the format, so quizzes use plain symbols such as ×, ², √ and V₁ instead.
 - **Marks in the colours students expect:** green for right, red for missed, keeping the drawn tick and cross rather than emoji.
 
 ### Still open
-- Formulas in summaries, quiz and exam settings, timed exam mode with past questions, diagrams in explanations, hosting.
+- Quiz and exam settings, timed exam mode with past questions, diagrams in explanations, hosting.
 
 ## Sun 22 Nov 2026
 
