@@ -9,10 +9,11 @@ Built for the [#BuildHybridAI 2026 hackathon](https://firebasehybridaihackathon.
 ## Features
 
 - **PDF reader.** Open or drop a PDF and read it page by page. Running headers, footers and page numbers are stripped from the text the AI reads, and paragraphs, headings, lists and contents entries are rebuilt. Pages that are scanned images are flagged.
+- **Comfortable reading.** Hide the page list, zoom from 75% to 250% (or press + and -), or enlarge the page to fill the screen. Pages are drawn at extra density so small print and formulas stay sharp.
 - **Highlight on the page.** Select words on the PDF itself and mark them with a yellow, green or pink highlighter. Click a highlight to recolour it, add a note, ask about it or remove it.
 - **A study sheet for every page.** A ruled sheet beside the page with four tabs: Summary, Ask, Quiz and Notes (your own notes in "blue biro" and the page's highlights with their notes). Summaries can be edited into your own words. A tab shows a dot while something behind it is working or waiting.
 - **Summarise a page.** 3 to 5 bullets, shown whole when ready. Every answer carries a badge with where it ran, how long it took and roughly how much data it used, for example "This laptop · 6.1 s · no data used".
-- **Quiz me.** Five multiple-choice questions from the page. Choose your answers, then the sheet marks them like a script: ticks and crosses in the margin, a circled score and a short explanation for each question. Quizzes and scores are saved on the device.
+- **Quiz me.** Five multiple-choice questions from the page. Choose your answers, then the sheet marks them like a script: a green tick or red cross in the margin, the right answer in green, a circled score and a short explanation for each question. Quizzes and scores are saved on the device.
 - **Ask about this page.** Type a question, or ask about highlighted words. Answers are kept on the sheet.
 - **Explain this.** Select words on the page and press Explain for a plain-words breakdown.
 - **Offline queue.** A hard question asked offline is marked "Queued" and goes to the cloud by itself the moment the connection returns (or press "Answer on this laptop now"). The same happens to any request that can't run offline because the on-device model isn't available, or because you chose Cloud. The queue is saved on the device, so it survives a reload, and the top bar shows how many items are waiting.
@@ -114,6 +115,8 @@ src/
   ai/quiz.ts              Quiz schema, parsing and validation
   ai/quizzes.ts           Writing and saving page quizzes
   components/PdfPage.tsx  Rendered page, selectable text layer and highlights
+  components/PageToolbar.tsx  Hide the page list, zoom and enlarge
+  lib/readerPrefs.ts      Zoom and page list choices, remembered on the device
   components/MarkToolbar.tsx     Highlighter colours, note and ask over a selection
   components/SummarySection.tsx  Summary on the study sheet, editable
   components/QuizSection.tsx     Quiz questions, marking and score

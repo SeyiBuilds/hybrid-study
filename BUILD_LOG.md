@@ -2,6 +2,27 @@
 
 What was built each day, what broke, and what we changed and why. Newest day first.
 
+## Thu 26 Nov 2026
+
+Seyi used the app for a week as a student and wrote up what he wanted changed. Working through that list.
+
+### Built
+- **Hide the page list.** A "Hide pages" button above the page gives the lecture note and the study sheet the room. The choice is remembered.
+- **Zoom and enlarge.** Zoom out and in (75% to 250% of the reading width) with the buttons or the + and - keys, and press the percentage to fit the width again. "Enlarge" lets the page fill the screen; Escape or "Back to study view" brings the sheet back. Zoomed pages scroll sideways inside the page area.
+- **Sharper pages.** Pages are drawn at least twice the screen's pixel density, so small print and formulas in scanned textbooks stay readable.
+- **Green and red marking.** Marked quizzes show a green tick and green answer for each question you got right, and a red cross with your wrong answer struck through in red. The circled score is green from half marks up.
+
+### What broke
+- **Pages were hard to read in the app.** Textbook pages with formulas looked soft, there was no way to zoom, and the page list took space Seyi wanted for the page and the sheet.
+- **Installing the hosting tools failed** with "host unreachable" while the connection dropped. Retried later.
+
+### What we changed and why
+- **Extra drawing density, with a ceiling.** The page canvas is drawn at 1.5 times the screen density (at least 2x) but kept under about 4,000 pixels wide, so zooming in doesn't eat memory on a 16 GB laptop.
+- **Marks in the colours students expect:** green for right, red for missed, keeping the drawn tick and cross rather than emoji.
+
+### Still open
+- Formulas in summaries, quiz and exam settings, timed exam mode with past questions, diagrams in explanations, hosting.
+
 ## Sun 22 Nov 2026
 
 ### Built
