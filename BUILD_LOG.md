@@ -8,19 +8,23 @@ What was built each day, what broke, and what we changed and why. Newest day fir
 - **Live at https://fir-ai-hackathon-9162d.web.app** on Firebase Hosting.
 - **App Check for everyone, not just the developer.** The hosted build uses a reCAPTCHA Enterprise key (free tier, no billing account), registered in Firebase App Check, so judges' browsers get App Check tokens without a debug token.
 - **The study sheet keeps its full width** (up to 34rem) beside the page; only the page list folds away.
+- **Diagrams in explanations.** Ask for one in words ("draw the forces on the beam") or tick "Add a diagram" beside Ask, and the answer comes with a labelled drawing on a white card, like a textbook figure. In the cloud, the model may also add one unasked when a picture makes the answer much clearer, including in "Explain this more" after an exam.
+- **Google Search Console verified** with both an HTML file and a meta tag, and the sitemap ready to submit.
 
 ### What broke
 - **The first upload stopped at 19 of 91 files** when the connection dropped. Firebase Hosting keeps the files it already has, so the retry only sent the rest and finished.
 - **PowerShell 5 adds a byte-order mark** when it writes UTF-8, which would have hidden the first setting in `.env` from Vite. The file was rewritten without one.
 
 ### What we changed and why
+- **Diagrams are drawn as SVG and shown as an image.** The model writes a small SVG drawing; the app keeps only drawing elements and attributes (lines, shapes, text, arrowheads), removes scripts, event handlers, links and images, and shows the result through an `<img>`, where SVG cannot run anything or load anything. A test drawing with a script, a click handler, a link and an outside image came through as just the drawing.
+- **Diagram questions go to the cloud.** Asking for a diagram makes a question "hard" for the router: Gemini Nano is too small to draw reliably, so with a connection it goes to the cloud, and offline it waits in the queue. Simple questions on the laptop don't carry drawing instructions, which keeps on-device prompts short.
 - **App Check token lifetime: 1 day.** A token is fetched from reCAPTCHA when it runs out. For students on patchy, metered connections, fewer refreshes mean less data and fewer chances to fail mid-study, and a day keeps far inside the free 10,000 checks a month.
 - **Checked the live site in a clean Chrome profile:** it loads, is installable, its service worker is active, robots.txt and sitemap.xml are served, reCAPTCHA Enterprise and App Check return tokens (HTTP 200), a real cloud request answered (HTTP 200), and Chrome's Prompt API is present on the hosted address, so no origin trial token is needed.
 
 ### Still open
 - Seyi to try the live site in his own Chrome: on-device answers, the Wi-Fi-off queue and an exam.
-- Google Search Console: add the site, verify it and submit the sitemap.
-- Diagrams in explanations.
+- Seyi to submit sitemap.xml in Search Console.
+- README architecture diagram and the Devpost write-up, then the demo video.
 
 ## Thu 26 Nov 2026
 

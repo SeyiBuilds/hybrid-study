@@ -20,6 +20,7 @@ Built for the [#BuildHybridAI 2026 hackathon](https://firebasehybridaihackathon.
 - **Exam mode.** A timed exam on a whole lecture note or a page range: 20, 40 or 60 questions, multiple choice with an optional written (theory) section, a chosen difficulty and time limit. Add a past-paper PDF and the new questions follow its style and difficulty without copying it. The notes close, a timer runs, answers save as you go, and the paper is handed in when time is up. Multiple choice is marked on the device; written answers are marked by the AI against a model answer. Results show the grade (A to F), a tick or cross per question, the correct answer, tips for missed questions, and "Explain this more" for a fuller explanation.
 - **Ask about this page.** Type a question, or ask about highlighted words. Answers are kept on the sheet.
 - **Explain this.** Select words on the page and press Explain for a plain-words breakdown.
+- **Diagrams.** Ask for a diagram, or tick "Add a diagram", and the answer comes with a labelled drawing (forces on a beam, a flowchart, a circuit). Drawings are made in the cloud and shown as a plain image, so nothing in them can run.
 - **Offline queue.** A hard question asked offline is marked "Queued" and goes to the cloud by itself the moment the connection returns (or press "Answer on this laptop now"). The same happens to any request that can't run offline because the on-device model isn't available, or because you chose Cloud. The queue is saved on the device, so it survives a reload, and the top bar shows how many items are waiting.
 - **Connected but no internet.** If Wi-Fi is up but the cloud can't be reached (no data left, a router without a connection), the app treats it as offline: the top bar says "No internet", the laptop answers what it can, and hard questions join the queue. Every 15 seconds it quietly checks the cloud's address (the same Google host it already uses), and sends the queue as soon as the internet is back, since the browser doesn't announce that.
 - **Run AI on: Auto, This laptop or Cloud.** Auto lets the router decide per request from the connection (offline, slow or solid), how hard the task is, the browser's data saver and whether the on-device model is ready. Simple tasks stay on the laptop, and hard questions use the cloud when the connection allows. The sheet says where a request will run, why and what it will cost before you press the button, and "How it decides" lists recent decisions with their reasons.
@@ -160,6 +161,7 @@ src/
   lib/sheetTab.ts         The open tab, and what is working or queued behind each one
   lib/pageText.ts         Header/footer removal and paragraph, heading and list rebuilding
   lib/symbols.ts          Repairs symbols PDFs store in old encodings (the empty boxes)
+  lib/diagram.ts          Cleans AI-drawn SVG diagrams and turns them into safe images
   components/RichText.tsx Formulas typeset with KaTeX, powers and bold in model text
   lib/highlights.ts       Turning a selection into page-relative highlight rectangles
   lib/runOn.ts            The student's Run AI on choice
