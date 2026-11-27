@@ -51,7 +51,7 @@ export function summarisePage(input: {
 }
 
 export interface AiLine {
-  kind: 'item' | 'para' | 'math'
+  kind: 'item' | 'para' | 'math' | 'diagram'
   text: string
   /** Belongs to the bullet above (a formula under it, or text after that formula). */
   indent?: boolean
@@ -64,6 +64,9 @@ export interface AiLine {
 const DISPLAY_MATH =
   /\$\$([\s\S]+?)\$\$|\\\[([\s\S]+?)\\\]|`([^`\n]*=[^`\n]*)`|\$(?!\s)([^$\n]*=[^$\n]*?)(?<!\s)\$|\\\(([^\n]*?=[^\n]*?)\\\)/g
 const MATH_MARK = '\u0000'
+const DIAGRAM_MARK = '\u0001'
+/** An SVG drawing, fenced (```svg … ```) or bare. */
+const SVG_BLOCK = /```(?:svg|xml|html)?\s*(<svg[\s\S]*?<\/svg>)\s*```|(<svg[\s\S]*?<\/svg>)/gi
 const BULLET = /^(?:[-*•–]|\d{1,2}[.)])\s+(.*)$/
 const BARE_BULLET = /^(?:[-*•–]|\d{1,2}[.)])$/
 
@@ -72,8 +75,15 @@ const BARE_BULLET = /^(?:[-*•–]|\d{1,2}[.)])$/
  * always get a line of their own, under the bullet they belong to.
  */
 export function parseAiText(text: string): AiLine[] {
+  const diagrams: string[] = []
   const marked = text
     .replace(/\r/g, '')
+    .replace(SVG_BLOCK, (_, fenced?: string, bare?: string) => {
+      diagrams.push(fenced ?? bare ?? '')
+      return `\n${DIAGRAM_MARK}${diagrams.length - 1}\n`
+    })
+    // A fence left with nothing in it (a cut-off drawing) is dropped.
+    .replace(/```(?:svg|xml|html)?\s*```/gi, '')
     .replace(DISPLAY_MATH, (_, ...groups: Array<string | undefined>) => {
       const tex = (groups.slice(0, 5).find((group) => group !== undefined) ?? '').replace(/\s*\n\s*/g, ' ').trim()
       return tex ? `\n${MATH_MARK}${tex}\n` : ''
@@ -85,6 +95,11 @@ export function parseAiText(text: string): AiLine[] {
     const line = raw.trim()
     // Skip empty lines, and lone punctuation left behind when a formula was lifted out of a sentence.
     if (!line || (afterMath && /^[.,;:]+$/.test(line))) continue
+    if (line.startsWith(DIAGRAM_MARK)) {
+      lines.push({ kind: 'diagram', text: diagrams[Number(line.slice(1))] ?? '' })
+      afterMath = true
+      continue
+    }
     if (line.startsWith(MATH_MARK)) {
       lines.push({ kind: 'math', text: line.slice(1), indent: inItem })
       afterMath = true

@@ -5,7 +5,8 @@
  */
 import katex from 'katex'
 import 'katex/dist/katex.min.css'
-import type { ReactNode } from 'react'
+import { useMemo, type ReactNode } from 'react'
+import { diagramUrl } from '../lib/diagram'
 
 const cache = new Map<string, string | null>()
 
@@ -22,6 +23,22 @@ function typeset(tex: string, displayMode: boolean): string | null {
   if (cache.size > 500) cache.clear()
   cache.set(key, html)
   return html
+}
+
+/**
+ * A diagram the AI drew, on a white card like a figure in a textbook. It is shown as an
+ * image, so nothing in it can run.
+ */
+export function Diagram({ svg }: { svg: string }) {
+  const url = useMemo(() => diagramUrl(svg), [svg])
+  if (!url) {
+    return <p className="font-sans text-[0.8rem] text-pencil">The diagram the AI drew could not be shown.</p>
+  }
+  return (
+    <figure className="my-2 overflow-hidden rounded-[6px] border border-rule bg-white p-2">
+      <img src={url} alt="Diagram drawn by the AI to illustrate the answer" className="mx-auto block h-auto max-h-[24rem] w-full object-contain" />
+    </figure>
+  )
 }
 
 /** A formula on its own line. Falls back to the raw text if it can't be typeset. */

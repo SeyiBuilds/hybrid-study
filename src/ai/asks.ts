@@ -1,6 +1,6 @@
 /** Questions about a page: run through the router, answers saved on the device. */
 import type { Target } from './client'
-import { classifyQuestion } from './difficulty'
+import { classifyQuestion, wantsDiagram } from './difficulty'
 import { dismissJob, runAiJob } from './jobs'
 import { askPrompt, documentContext } from './prompts'
 import { registerQueueRunner } from './queue'
@@ -39,6 +39,8 @@ export function buildAskPrompt(input: AskInput, target: Target): string {
   return askPrompt({
     ...input,
     documentText: crossPage && target === 'in_cloud' ? documentContext(input.pages, input.page) : undefined,
+    // Drawn when asked for; offered unasked only in the cloud, to keep on-device prompts short.
+    diagram: wantsDiagram(input.question) ? 'asked' : target === 'in_cloud' ? 'auto' : 'off',
   })
 }
 

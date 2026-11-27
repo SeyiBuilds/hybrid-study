@@ -326,9 +326,10 @@ export function explainJobKey(examId: string, index: number): string {
 export function explainExamQuestion(exam: Exam, index: number, pages: PageText[], force?: Target): Promise<void> {
   const question = exam.questions[index]
   const given = exam.answers[index]
-  const prompt =
+  const prompt = (decision: RouteDecision) =>
     question.kind === 'mcq'
       ? explainExamPrompt({
+          diagram: decision.target === 'in_cloud' ? 'auto' : 'off',
           question: question.question,
           options: question.options,
           correct: `${'ABCD'[question.correct]}. ${question.options[question.correct]}`,
@@ -336,6 +337,7 @@ export function explainExamQuestion(exam: Exam, index: number, pages: PageText[]
           notes: relevantNotes(pages, question.question),
         })
       : explainExamPrompt({
+          diagram: decision.target === 'in_cloud' ? 'auto' : 'off',
           question: question.question,
           correct: question.modelAnswer,
           given: typeof given === 'string' ? given : '',

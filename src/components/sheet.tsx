@@ -9,7 +9,7 @@ import { dataSize, seconds } from '../lib/format'
 import { networkLabel, useNetwork, type NetworkState } from '../lib/network'
 import { forcedTarget, setRunOn, useRunOn, type RunOn } from '../lib/runOn'
 import { Segmented } from './controls'
-import { MathBlock, Rich } from './RichText'
+import { Diagram, MathBlock, Rich } from './RichText'
 import type { DotKind, RunPreview } from './sheetStyles'
 
 /** A row of the sheet, to the right of the margin rule, with an optional note written in the margin. */
@@ -83,6 +83,13 @@ export function AiText({ text }: { text: string }) {
     <div className="reading reveal">
       {parseAiText(text).map((line, index) => {
         const indent = line.indent ? 'pl-[1.125rem]' : ''
+        if (line.kind === 'diagram') {
+          return (
+            <div key={index} className={indent}>
+              <Diagram svg={line.text} />
+            </div>
+          )
+        }
         if (line.kind === 'math') {
           return (
             <div key={index} className={`my-1 ${indent}`}>

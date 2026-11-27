@@ -9,6 +9,22 @@ import type { PageText } from '../lib/pageText'
 /** About 1,500 tokens of page text: comfortably inside the on-device limit with room for the answer. */
 const MAX_PAGE_CHARS = 6000
 
+/** When to draw: when the student asks, or (cloud only) when a picture would clearly help. */
+export type DiagramRule = 'asked' | 'auto' | 'off'
+
+const DIAGRAM_FORMAT =
+  'Draw it as SVG inside a ```svg code block after the explanation: viewBox="0 0 400 260", black lines on a white background, short text labels (font-size 12 to 14), arrows as lines with a small arrowhead. No scripts, images or links.'
+
+function diagramRule(rule: DiagramRule): string[] {
+  if (rule === 'asked') return [`The student asked for a diagram, so add one simple labelled diagram. ${DIAGRAM_FORMAT}`]
+  if (rule === 'auto') {
+    return [
+      `If one simple diagram would make the answer much clearer (forces on a beam, a free-body diagram, a flowchart, a circuit, a graph or a process), add it. ${DIAGRAM_FORMAT}`,
+    ]
+  }
+  return []
+}
+
 /** How formulas should be written so the app can typeset them on their own lines. */
 const FORMULA_RULE =
   'Write every formula, equation or calculation step on its own line as LaTeX between $$ and $$, directly under the sentence or bullet it belongs to, never in the middle of a sentence. For example:\n- Weight depends on mass and gravity:\n$$w = mg$$'
@@ -43,6 +59,7 @@ export function askPrompt({
   question,
   quote,
   documentText,
+  diagram = 'off',
 }: {
   pageText: string
   title: string
@@ -51,12 +68,14 @@ export function askPrompt({
   quote?: string
   /** Text from several pages, used instead of the current page for cross-page questions. */
   documentText?: string
+  diagram?: DiagramRule
 }): string {
   return [
     'You help a university student understand their lecture notes.',
     'Answer the question in plain English in at most 120 words. Use short bullet points starting with "- " only if they make the answer clearer.',
     'If the answer involves a calculation, show each step and say briefly why it is done.',
     FORMULA_RULE,
+    ...diagramRule(diagram),
     documentText
       ? `Base the answer on the notes below. The student is reading page ${page}. If the notes do not contain the answer, start with "Not in these notes:" and answer briefly from general knowledge.`
       : 'Base the answer on the page text. If the page does not contain the answer, start with "Not on this page:" and answer briefly from general knowledge.',
@@ -258,7 +277,9 @@ export function explainExamPrompt({
   correct,
   given,
   notes,
+  diagram = 'off',
 }: {
+  diagram?: DiagramRule
   question: string
   /** Lettered options for objective questions. */
   options?: string[]
@@ -279,6 +300,7 @@ export function explainExamPrompt({
     'If it involves a calculation, show each step and say why it is done, and give any tip or shortcut that makes it easier.',
     'At most 180 words. Use short bullet points starting with "- " where they help.',
     FORMULA_RULE,
+    ...diagramRule(diagram),
     '',
     'Relevant notes:',
     '"""',

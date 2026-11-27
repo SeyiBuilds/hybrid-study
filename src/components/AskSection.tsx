@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import type { OnDeviceStatus } from '../ai/client'
 import { askAboutPage, askIdFromKey, askJobPrefix, buildAskPrompt, type AskMeta } from '../ai/asks'
-import { classifyQuestion } from '../ai/difficulty'
+import { classifyQuestion, wantsDiagram } from '../ai/difficulty'
 import { cancelQueued, dismissJob, useJobs } from '../ai/jobs'
 import { deleteAnswer, listAnswers, type PageAnswer } from '../lib/library'
 import { hasUsableText, type PageText } from '../lib/pageText'
@@ -50,6 +50,7 @@ export function AskSection({
   const jobs = useJobs<PageAnswer, AskMeta>(prefix)
   const [saved, setSaved] = useState<{ prefix: string; answers: PageAnswer[] } | null>(null)
   const [question, setQuestion] = useState('')
+  const [withDiagram, setWithDiagram] = useState(false)
   // The newest highlight sent from the page wins until the student clears it or asks.
   const [usedNonce, setUsedNonce] = useState<number | null>(null)
   const quote = prefill && prefill.nonce !== usedNonce ? prefill.quote : null
@@ -84,7 +85,9 @@ export function AskSection({
   }, [saved, prefix, jobs])
   const pending = jobs.filter((job) => job.status !== 'done')
 
-  const input = { documentId, title, page: page.number, pageText: page.text, pages, question: question.trim(), quote: quote ?? undefined }
+  // "Add a diagram" asks for one in words, so the answer, the router and the offline queue all see it.
+  const asked = question.trim() && withDiagram && !wantsDiagram(question) ? `${question.trim()} (with a diagram)` : question.trim()
+  const input = { documentId, title, page: page.number, pageText: page.text, pages, question: asked, quote: quote ?? undefined }
   const preview = previewRun({
     task: 'ask',
     difficulty: classifyQuestion(input.question).difficulty,
@@ -99,6 +102,7 @@ export function AskSection({
     if (!canAsk) return
     void askAboutPage({ ...input, force: forcedTarget(runOn) })
     setQuestion('')
+    setWithDiagram(false)
     clearQuote()
   }
 
@@ -149,11 +153,20 @@ export function AskSection({
             />
           </Row>
           <Row>
-            <p className="on-lines">
+            <div className="on-lines flex items-center gap-5">
               <button type="button" onClick={submit} disabled={!canAsk} className={pillButton}>
                 Ask
               </button>
-            </p>
+              <label className="flex cursor-pointer items-center gap-2 font-sans text-[0.8rem] text-pencil hover:text-ink">
+                <input
+                  type="checkbox"
+                  checked={withDiagram}
+                  onChange={(event) => setWithDiagram(event.target.checked)}
+                  className="h-3.5 w-3.5 cursor-pointer accent-[var(--color-ink)]"
+                />
+                Add a diagram
+              </label>
+            </div>
           </Row>
           <RunHint preview={preview} />
         </>
