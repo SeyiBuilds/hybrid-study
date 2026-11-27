@@ -2,6 +2,8 @@
 
 A study companion for students with patchy, expensive internet. Open a lecture PDF and get summaries, quizzes and explanations from AI that **runs on your laptop when it can and in the cloud when it must**. A router picks where each request runs, based on the network, how hard the task is and how fast your device is, so the app keeps working offline and only spends data when it's worth it.
 
+**Try it:** https://fir-ai-hackathon-9162d.web.app (desktop Chrome 148 or newer for on-device AI; other browsers use the cloud).
+
 Built for the [#BuildHybridAI 2026 hackathon](https://firebasehybridaihackathon.devpost.com/) with [Firebase AI Logic](https://firebase.google.com/docs/ai-logic/hybrid-on-device-inference) hybrid inference (Gemini Nano in Chrome + Gemini in the cloud).
 
 > **Status:** in active development. Working now: open a lecture PDF, highlight and take notes on it, then summarise, question and quiz yourself on any page, with a router that picks the device or the cloud for each request, a running count of the data saved, and an offline queue that answers hard questions when the connection comes back. Saving progress with Firestore and tuning the router with Remote Config are next. See [BUILD_LOG.md](BUILD_LOG.md) for progress.
@@ -32,7 +34,7 @@ Built for the [#BuildHybridAI 2026 hackathon](https://firebasehybridaihackathon.
 - `src/ai/router.ts` is the single entry point for generation. It decides per request which model to use (or follows the student's "Run AI on" choice) and returns a short reason string. Inputs come from `navigator.connection` (`src/lib/network.ts`), question difficulty (`src/ai/difficulty.ts`) and on-device availability; thresholds live in `src/ai/routerConfig.ts`.
 - Cross-page questions routed to the cloud get text from nearby pages of the document. On-device requests stay within the current page.
 - Quizzes use structured output: one `Schema` is passed as `responseConstraint` on-device and `responseSchema` in the cloud (`src/ai/quiz.ts`). Every reply is still parsed and validated, and an unusable reply is requested once more.
-- App Check protects the cloud calls (debug provider in development).
+- App Check protects the cloud calls: reCAPTCHA Enterprise on the hosted site, the debug provider in development.
 
 ## Requirements
 

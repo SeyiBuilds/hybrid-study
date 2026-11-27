@@ -2,6 +2,26 @@
 
 What was built each day, what broke, and what we changed and why. Newest day first.
 
+## Fri 27 Nov 2026
+
+### Built
+- **Live at https://fir-ai-hackathon-9162d.web.app** on Firebase Hosting.
+- **App Check for everyone, not just the developer.** The hosted build uses a reCAPTCHA Enterprise key (free tier, no billing account), registered in Firebase App Check, so judges' browsers get App Check tokens without a debug token.
+- **The study sheet keeps its full width** (up to 34rem) beside the page; only the page list folds away.
+
+### What broke
+- **The first upload stopped at 19 of 91 files** when the connection dropped. Firebase Hosting keeps the files it already has, so the retry only sent the rest and finished.
+- **PowerShell 5 adds a byte-order mark** when it writes UTF-8, which would have hidden the first setting in `.env` from Vite. The file was rewritten without one.
+
+### What we changed and why
+- **App Check token lifetime: 1 day.** A token is fetched from reCAPTCHA when it runs out. For students on patchy, metered connections, fewer refreshes mean less data and fewer chances to fail mid-study, and a day keeps far inside the free 10,000 checks a month.
+- **Checked the live site in a clean Chrome profile:** it loads, is installable, its service worker is active, robots.txt and sitemap.xml are served, reCAPTCHA Enterprise and App Check return tokens (HTTP 200), a real cloud request answered (HTTP 200), and Chrome's Prompt API is present on the hosted address, so no origin trial token is needed.
+
+### Still open
+- Seyi to try the live site in his own Chrome: on-device answers, the Wi-Fi-off queue and an exam.
+- Google Search Console: add the site, verify it and submit the sitemap.
+- Diagrams in explanations.
+
 ## Thu 26 Nov 2026
 
 Seyi used the app for a week as a student and wrote up what he wanted changed. Working through that list.
